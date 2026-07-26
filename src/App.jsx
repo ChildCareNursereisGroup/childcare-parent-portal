@@ -24,11 +24,68 @@ const BRANCHES = [
     address: { ar: "القاسمية، المحطة، الشارقة", en: "Al Qasimia, Al Mahatta, Sharjah" },
     fb: "facebook.com/SharjahNursery",
     ig: "instagram.com/al_farha_nursery",
+    bank: { holder: "AL FARHA NURSERY LLC SOLE PROPRIETORSHIP", iban: "AE640860000009210784074", bic: "WIOBAEADXXX", bank: "Wio Bank" },
   },
-  { key: "saada", name: { ar: "السعادة – الشارقان", en: "Al Saada – Al Shargan" }, phone: "+971 50 474 2500", whatsapp: "+971 50 474 2500", address: { ar: "منطقة الشارقان، الشارقة", en: "Sharqan Area, Sharjah" }, fb: "facebook.com/BestNurseryUAE", ig: "instagram.com/al_saada_nursery" },
-  { key: "dolphin", name: { ar: "دولفين – سمنان", en: "Dolphin – Samnan" }, phone: "+971 50 114 4919", whatsapp: "+971 50 114 4919", address: { ar: "منطقة سمنان، الشارقة", en: "Samnan Area, Sharjah" }, fb: "facebook.com/search/top?q=dolphin nursery", ig: "instagram.com/dolphin_nursery" },
-  { key: "saadakids", name: { ar: "السعادة للأطفال", en: "Al Saada for Kids" }, phone: "+971 54 373 1196", whatsapp: "+971 54 373 1196", address: { ar: "عجمان", en: "Ajman" }, fb: "facebook.com/AjmanbestNursery", ig: "instagram.com/alsaadaforkidsacademic" },
-  { key: "abtal", name: { ar: "أبطال البراعم", en: "Abtal Al Baraiem" }, phone: "", whatsapp: "", address: { ar: "المجاز، الشارقة", en: "Al Majaz, Sharjah" }, fb: "facebook.com/profile.php?id=61578275925707", ig: "instagram.com/abtal_al_baraiem" },
+  {
+    key: "saada",
+    name: { ar: "السعادة – الشارقان", en: "Al Saada – Al Shargan" },
+    phone: "+971 50 474 2500", whatsapp: "+971 50 474 2500",
+    address: { ar: "منطقة الشارقان، الشارقة", en: "Sharqan Area, Sharjah" },
+    fb: "facebook.com/BestNurseryUAE", ig: "instagram.com/al_saada_nursery",
+    bank: { holder: "AL SAADA NURSERY LLC - SOLE PROPRIETORSHIP", iban: "AE900860000009361897772", bic: "WIOBAEADXXX", bank: "Wio Bank" },
+  },
+  {
+    key: "dolphin",
+    name: { ar: "دولفين – سمنان", en: "Dolphin – Samnan" },
+    phone: "+971 50 114 4919", whatsapp: "+971 50 114 4919",
+    address: { ar: "منطقة سمنان، الشارقة", en: "Samnan Area, Sharjah" },
+    fb: "facebook.com/search/top?q=dolphin nursery", ig: "instagram.com/dolphin_nursery",
+    bank: { holder: "Dolphin Nursery", iban: "AE53003001130435820001", bic: "ADCBAEAAXXX", bank: "Abu Dhabi Commercial Bank" },
+  },
+  {
+    key: "saadakids",
+    name: { ar: "السعادة للأطفال", en: "Al Saada for Kids" },
+    phone: "+971 54 373 1196", whatsapp: "+971 54 373 1196",
+    address: { ar: "عجمان", en: "Ajman" },
+    fb: "facebook.com/AjmanbestNursery", ig: "instagram.com/alsaadaforkidsacademic",
+    bank: { holder: "AL SAADA FOR KIDS LLC S.P.", iban: "AE900030012459108920001", bic: "ADCBAEAAXXX", bank: "Abu Dhabi Commercial Bank (Ajman, Br. 321)" },
+  },
+  {
+    key: "abtal",
+    name: { ar: "أبطال البراعم", en: "Abtal Al Baraiem" },
+    phone: "", whatsapp: "",
+    address: { ar: "المجاز، الشارقة", en: "Al Majaz, Sharjah" },
+    fb: "facebook.com/profile.php?id=61578275925707", ig: "instagram.com/abtal_al_baraiem",
+    bank: { holder: "ABTAL AL BARAIEM ENTERTAINMENT GAMES CENTER L.L.C.SP", iban: "AE780860000009055207559", bic: "WIOBAEADXXX", bank: "Wio Bank" },
+  },
+];
+
+// New Academic Year 2026/2027 pricing (same across all branches).
+// Regular attendance is Monday-Thursday. Payment frequency (monthly/weekly/
+// daily) changes the rate. Weekend days (Fri/Sat/Sun) are an ADD-ON on top
+// of the regular plan, not an alternative to it — no daily rate exists for
+// weekend days, only monthly/weekly.
+const ONE_TIME_FEES = { registration: 300, stationery: 200, uniform: 315 };
+const FREQUENCIES = [
+  { key: "monthly", label: { ar: "شهري", en: "Monthly" } },
+  { key: "weekly", label: { ar: "أسبوعي", en: "Weekly" } },
+  { key: "daily", label: { ar: "يومي", en: "Daily" } },
+];
+const PLANS = [
+  { key: "slot_8_11", label: { ar: "الاثنين - الخميس · ٨:٠٠ ص - ١١:٠٠ ص", en: "Mon-Thu · 8:00-11:00" }, monthly: 800, weekly: 250, daily: 60 },
+  { key: "slot_11_3", label: { ar: "الاثنين - الخميس · ١١:٠٠ ص - ٣:٠٠ م", en: "Mon-Thu · 11:00-3:00" }, monthly: 1000, weekly: 350, daily: 80 },
+  { key: "slot_8_1", label: { ar: "الاثنين - الخميس · ٨:٠٠ ص - ١:٠٠ م (+ساعة إضافية ١٠٠ د.إ)", en: "Mon-Thu · 8:00-1:00 (+AED100/extra hour)" }, monthly: 1100, weekly: 360, daily: 100 },
+  { key: "slot_1_5", label: { ar: "الاثنين - الخميس · ١:٠٠ م - ٥:٠٠ م", en: "Mon-Thu · 1:00-5:00" }, monthly: 800, weekly: 250, daily: 80 },
+];
+const TRANSPORT_OPTIONS = [
+  { key: "none", label: { ar: "بدون مواصلات", en: "No transportation" }, monthly: 0, weekly: 0, daily: 0 },
+  { key: "one_way", label: { ar: "مواصلات اتجاه واحد", en: "Transportation, one way" }, monthly: 200, weekly: 60, daily: 20 },
+  { key: "two_way", label: { ar: "مواصلات اتجاهين", en: "Transportation, two ways" }, monthly: 300, weekly: 100, daily: 30 },
+];
+const WEEKEND_DAYS = [
+  { key: "friday", label: { ar: "الجمعة", en: "Friday" }, monthly: 150, weekly: 50 },
+  { key: "saturday", label: { ar: "السبت", en: "Saturday" }, monthly: 150, weekly: 50 },
+  { key: "sunday", label: { ar: "الأحد", en: "Sunday" }, monthly: 150, weekly: 50 },
 ];
 
 const NATIONALITIES = ["Emirati|إماراتي", "Egyptian|مصري", "Indian|هندي", "Pakistani|باكستاني", "Filipino|فلبيني", "Syrian|سوري", "Jordanian|أردني", "British|بريطاني", "Other|غير ذلك"];
@@ -58,7 +115,7 @@ const QUICK_NOTES = [
   "Needs encouragement to try new foods|يحتاج تشجيعًا على تجربة أطعمة جديدة",
 ];
 const COMPLAINT_TOPICS = ["Fees|الرسوم", "Transportation|المواصلات", "Health|الصحة", "Activities|الأنشطة", "Other|غير ذلك"];
-const WEEK = ["Sunday|الأحد", "Monday|الاثنين", "Tuesday|الثلاثاء", "Wednesday|الأربعاء", "Thursday|الخميس"];
+const WEEK = ["Monday|الاثنين", "Tuesday|الثلاثاء", "Wednesday|الأربعاء", "Thursday|الخميس"];
 
 function split(s) { const [en, ar] = s.split("|"); return { en, ar: ar || en }; }
 
@@ -165,6 +222,25 @@ function CheckRow({ label, checked, onChange }) {
       </span>
       <span className="text-xs font-bold text-slate-600">{label}</span>
     </button>
+  );
+}
+function FileUploadRow({ label, status, fileName, error, onSelect }) {
+  const { tr } = useLang();
+  return (
+    <div className="flex items-center justify-between bg-white border border-slate-100 rounded-xl p-3 gap-2">
+      <label className={`text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1 shrink-0 cursor-pointer ${status === "done" ? "bg-emerald-50 text-emerald-500" : status === "uploading" ? "bg-slate-100 text-slate-400" : "bg-sky-500 text-white"}`}>
+        <input type="file" accept="image/*,.pdf" className="hidden"
+          onChange={(e) => { const file = e.target.files?.[0]; if (file) onSelect(file); e.target.value = ""; }}
+          disabled={status === "uploading"} />
+        {status === "done" ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
+        {status === "uploading" ? tr("جارِ الرفع...", "Uploading...") : status === "done" ? tr("تم الرفع", "Uploaded") : tr("رفع", "Upload")}
+      </label>
+      <div className="text-right flex-1 min-w-0">
+        <span className="text-sm text-slate-700 font-bold block">{label}</span>
+        {fileName && status !== "error" && <span className="text-[10px] text-slate-400 block truncate">{fileName}</span>}
+        {error && <span className="text-[10px] text-rose-500 block">{tr("فشل الرفع، حاولي تاني", "Upload failed, try again")}</span>}
+      </div>
+    </div>
   );
 }
 function StepDots({ step, total }) {
@@ -552,9 +628,24 @@ function RegisterForm({ onBack, showToast, standalone }) {
   const [step, setStep] = useState(0);
   const [f, setF] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [regId] = useState(() => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`));
+  const [files, setFiles] = useState({});
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
   const setEv = (k) => (e) => set(k)(e.target.value);
   const toggleSkill = (k) => setF((s) => ({ ...s, skills: { ...(s.skills || {}), [k]: !(s.skills || {})[k] } }));
+
+  const uploadFile = async (key, file) => {
+    setFiles((s) => ({ ...s, [key]: { status: "uploading", name: file.name } }));
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+    const path = `${regId}/${key}-${Date.now()}-${safeName}`;
+    const { error } = await supabase.storage.from("registration-documents").upload(path, file);
+    if (error) {
+      setFiles((s) => ({ ...s, [key]: { status: "error", name: file.name, error: error.message } }));
+      return;
+    }
+    setFiles((s) => ({ ...s, [key]: { status: "done", name: file.name, path } }));
+  };
+  const anyUploading = Object.values(files).some((x) => x.status === "uploading");
 
   const steps = [
     tr("بيانات الطفل", "Child Info"),
@@ -565,6 +656,8 @@ function RegisterForm({ onBack, showToast, standalone }) {
     tr("الحالة الصحية", "Health"),
     tr("عن الطفل ومهاراته", "About & Skills"),
     tr("العادات والموافقة", "Habits & Consent"),
+    tr("الخطة والرسوم", "Plan & Fees"),
+    tr("المستندات المطلوبة", "Required Documents"),
     tr("الإقرار والتوقيع", "Acknowledgement"),
   ];
 
@@ -578,11 +671,35 @@ function RegisterForm({ onBack, showToast, standalone }) {
     } = await supabase.auth.getUser();
     const contactEmail = f.fEmail || f.mEmail || user?.email || null;
     const selectedBranch = BRANCHES.find((b) => b.name.en === f.branch);
+    const freq = f.frequency || "monthly";
+    const selectedPlan = PLANS.find((p) => p.key === f.plan);
+    const selectedTransport = TRANSPORT_OPTIONS.find((t) => t.key === f.transportPlan);
+    const selectedWeekendDays = WEEKEND_DAYS.filter((d) => (f.weekendDays || {})[d.key]);
+    const weekendFee = freq === "daily" ? 0 : selectedWeekendDays.reduce((sum, d) => sum + (d[freq] || 0), 0);
+    const recurringFee = (selectedPlan?.[freq] || 0) + (selectedTransport?.[freq] || 0) + weekendFee;
+    const oneTimeFee = ONE_TIME_FEES.registration + ONE_TIME_FEES.stationery + ONE_TIME_FEES.uniform;
     const { error } = await supabase.from("portal_registrations").insert({
       branch: selectedBranch?.key || f.branch || null,
       contact_email: contactEmail,
       parent_user_id: user?.id || null,
       form_data: f,
+      documents: {
+        father_id: files.fatherId?.path || null,
+        mother_id: files.motherId?.path || null,
+        child_id: files.childId?.path || null,
+        child_photo: files.childPhoto?.path || null,
+        vaccination_card: files.vaxCard?.path || null,
+        vaccination_pledge: !!f.vaxPledge,
+        billing: {
+          frequency: freq,
+          plan_key: selectedPlan?.key || null,
+          plan_label: selectedPlan?.label.en || null,
+          transport_key: selectedTransport?.key || null,
+          weekend_days: selectedWeekendDays.map((d) => d.key),
+          recurring_fee: recurringFee,
+          one_time_fee: oneTimeFee,
+        },
+      },
     });
     setSubmitting(false);
     if (error) {
@@ -753,11 +870,181 @@ function RegisterForm({ onBack, showToast, standalone }) {
         </>)}
 
         {step === 8 && (<>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-40 overflow-y-auto text-[11px] text-slate-600 leading-relaxed space-y-1">
-            <p>{tr("1. تُسدد الرسوم مقدماً قبل يوم 27 من كل شهر.", "1. Fees are paid in advance by the 27th of each month.")}</p>
-            <p>{tr("2. الرسوم المدفوعة غير قابلة للاسترداد تحت أي ظرف.", "2. Fees paid are non-refundable under any circumstances.")}</p>
-            <p>{tr("3. رسوم تأخير 20 درهم/ساعة عن التأخر في الاصطحاب.", "3. A late-pickup fee of AED 20/hour applies.")}</p>
-            <p>{tr("...وباقي البنود الكاملة كما في استمارة التسجيل الورقية (17 بندًا).", "...and the remaining full terms as in the paper registration form (17 clauses).")}</p>
+          <p className="text-xs font-bold text-slate-500">{tr("طريقة الدفع", "Payment frequency")}</p>
+          <div className="flex gap-1.5 justify-end">
+            {FREQUENCIES.map((fr) => (
+              <button key={fr.key} type="button" onClick={() => set("frequency")(fr.key)}
+                className={`text-[11px] px-3 py-1.5 rounded-full border font-bold ${(f.frequency || "monthly") === fr.key ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-500 border-slate-200"}`}>
+                {tr(fr.label.ar, fr.label.en)}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-xs font-bold text-slate-500 pt-2">{tr("خطة الدوام (الاثنين - الخميس)", "Attendance plan (Mon-Thu)")}</p>
+          <div className="space-y-2">
+            {PLANS.map((p) => {
+              const freq = f.frequency || "monthly";
+              return (
+                <button key={p.key} type="button" onClick={() => set("plan")(p.key)}
+                  className={`w-full flex items-center justify-between rounded-xl border p-3 text-right ${f.plan === p.key ? "bg-sky-50 border-sky-400" : "bg-white border-slate-200"}`}>
+                  <span className="text-xs font-bold text-slate-800 shrink-0">{tr(`${p[freq]} د.إ`, `AED ${p[freq]}`)}</span>
+                  <span className="text-xs font-bold text-slate-600">{tr(p.label.ar, p.label.en)}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="text-xs font-bold text-slate-500 pt-2">{tr("المواصلات", "Transportation")}</p>
+          <div className="flex gap-1.5 flex-wrap justify-end">
+            {TRANSPORT_OPTIONS.map((t) => {
+              const freq = f.frequency || "monthly";
+              return (
+                <button key={t.key} type="button" onClick={() => set("transportPlan")(t.key)}
+                  className={`text-[11px] px-3 py-1.5 rounded-full border font-bold ${f.transportPlan === t.key ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-500 border-slate-200"}`}>
+                  {tr(t.label.ar, t.label.en)}{t[freq] ? ` (+${t[freq]})` : ""}
+                </button>
+              );
+            })}
+          </div>
+
+          {f.frequency !== "daily" && (<>
+            <p className="text-xs font-bold text-slate-500 pt-2">{tr("إضافة أيام نهاية الأسبوع (رسوم إضافية)", "Add weekend days (extra fees)")}</p>
+            <div className="flex gap-1.5 flex-wrap justify-end">
+              {WEEKEND_DAYS.map((d) => {
+                const freq = f.frequency || "monthly";
+                const checked = !!(f.weekendDays || {})[d.key];
+                return (
+                  <button key={d.key} type="button"
+                    onClick={() => setF((s) => ({ ...s, weekendDays: { ...(s.weekendDays || {}), [d.key]: !(s.weekendDays || {})[d.key] } }))}
+                    className={`text-[11px] px-3 py-1.5 rounded-full border font-bold ${checked ? "bg-purple-500 text-white border-purple-500" : "bg-white text-slate-500 border-slate-200"}`}>
+                    {tr(d.label.ar, d.label.en)} (+{d[freq]})
+                  </button>
+                );
+              })}
+            </div>
+          </>)}
+
+          {(() => {
+            const freq = f.frequency || "monthly";
+            const plan = PLANS.find((p) => p.key === f.plan);
+            const transport = TRANSPORT_OPTIONS.find((t) => t.key === f.transportPlan);
+            const weekendTotal = WEEKEND_DAYS.reduce((sum, d) => sum + ((f.weekendDays || {})[d.key] ? d[freq] || 0 : 0), 0);
+            const recurringTotal = (plan?.[freq] || 0) + (transport?.[freq] || 0) + weekendTotal;
+            const oneTimeTotal = ONE_TIME_FEES.registration + ONE_TIME_FEES.stationery + ONE_TIME_FEES.uniform;
+            const freqLabel = FREQUENCIES.find((fr) => fr.key === freq);
+            const branch = BRANCHES.find((b) => b.name.en === f.branch);
+            return (
+              <>
+                <div className="bg-slate-800 rounded-2xl p-4 text-white space-y-2 mt-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold">{plan ? tr(`${recurringTotal} د.إ`, `AED ${recurringTotal}`) : "—"}</span>
+                    <span className="text-slate-300">{tr(`الرسوم المتوقعة (${tr(freqLabel.label.ar, freqLabel.label.en)})`, `Estimated fees (${freqLabel.label.en})`)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold">{tr(`${oneTimeTotal} د.إ`, `AED ${oneTimeTotal}`)}</span>
+                    <span className="text-slate-300">{tr("رسوم لمرة واحدة (تسجيل + قرطاسية + زي)", "One-time fees (registration + stationery + uniform)")}</span>
+                  </div>
+                </div>
+                {branch && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-emerald-700 leading-relaxed space-y-0.5">
+                    <p className="font-bold">{tr("بيانات التحويل البنكي (فرع " + tr(branch.name.ar, branch.name.en) + ")", "Bank transfer details (" + tr(branch.name.ar, branch.name.en) + " branch)")}</p>
+                    <p>{branch.bank.holder}</p>
+                    <p dir="ltr">IBAN: {branch.bank.iban}</p>
+                    <p dir="ltr">BIC/SWIFT: {branch.bank.bic}</p>
+                    <p>{branch.bank.bank}</p>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </>)}
+
+        {step === 9 && (<>
+          <p className="text-xs text-slate-400">{tr("ارفعي صور واضحة للمستندات التالية (JPG, PNG أو PDF)", "Upload clear photos of the following documents (JPG, PNG, or PDF)")}</p>
+          <FileUploadRow label={tr("صورة هوية الأب", "Father's ID copy")} status={files.fatherId?.status} fileName={files.fatherId?.name} error={files.fatherId?.error} onSelect={(file) => uploadFile("fatherId", file)} />
+          <FileUploadRow label={tr("صورة هوية الأم", "Mother's ID copy")} status={files.motherId?.status} fileName={files.motherId?.name} error={files.motherId?.error} onSelect={(file) => uploadFile("motherId", file)} />
+          <FileUploadRow label={tr("صورة هوية الطفل (إن وجدت)", "Child's ID copy (if issued)")} status={files.childId?.status} fileName={files.childId?.name} error={files.childId?.error} onSelect={(file) => uploadFile("childId", file)} />
+          <FileUploadRow label={tr("صورة شخصية للطفل", "Child's personal photo")} status={files.childPhoto?.status} fileName={files.childPhoto?.name} error={files.childPhoto?.error} onSelect={(file) => uploadFile("childPhoto", file)} />
+          <div className="h-px bg-slate-100 my-1" />
+          <FileUploadRow label={tr("كارت التطعيمات", "Vaccination card")} status={files.vaxCard?.status} fileName={files.vaxCard?.name} error={files.vaxCard?.error} onSelect={(file) => uploadFile("vaxCard", file)} />
+          <button type="button" onClick={() => set("vaxPledge")(!f.vaxPledge)} className="w-full flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl p-3 gap-2">
+            <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${f.vaxPledge ? "bg-amber-500 border-amber-500" : "border-amber-300"}`}>
+              {f.vaxPledge && <Check className="w-3 h-3 text-white" />}
+            </span>
+            <span className="text-xs text-amber-700 leading-relaxed flex-1 text-right">{tr("كارت التطعيمات مش متاح دلوقتي — أتعهد بأن الطفل مكتمل التطعيمات وهقدم الكارت لاحقاً", "Vaccination card not available right now — I pledge the child is fully vaccinated and will provide the card later")}</span>
+          </button>
+        </>)}
+
+        {step === 10 && (<>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-64 overflow-y-auto text-[11px] text-slate-600 leading-relaxed space-y-2">
+            <p>{tr(
+              "1. تُسدد الرسوم الشهرية مقدماً في موعد أقصاه يوم 27 من الشهر السابق لشهر الدراسة؛ ويحق للحضانة عدم قبول الطفل اعتباراً من اليوم الأول من الشهر الجديد حتى استكمال السداد، دون أي مسؤولية عليها عن ذلك.",
+              "1. Monthly fees are paid in advance, no later than the 27th of the month before the study month; the nursery may refuse to admit the child from the 1st of the new month until payment is completed, without any liability."
+            )}</p>
+            <p>{tr(
+              "2. الرسوم المدفوعة (التسجيل / الحجز / الشهرية / أي رسوم إدارية) غير قابلة للاسترداد أو التحويل مهما كانت الأسباب أو الظروف.",
+              "2. Fees paid (registration / reservation / monthly / any administrative fees) are non-refundable and non-transferable for any reason or circumstance."
+            )}</p>
+            <p>{tr(
+              "3. لا يحق استرداد الرسوم أو تخفيضها بسبب غياب الطفل أو مرضه.",
+              "3. No refund or reduction of fees is due for the child's absence or illness."
+            )}</p>
+            <p>{tr(
+              "4. تحتفظ إدارة الحضانة بحق إيقاف تسجيل أي طفل لا يلتزم بالقواعد، أو يظهر سلوكاً غير مقبول، أو يشكل خطراً على نفسه أو على الآخرين، على أن يتم إخطار ولي الأمر كتابياً قبل أسبوع واحد من الإيقاف.",
+              "4. Management reserves the right to suspend the registration of any child who does not comply with the rules, shows unacceptable behavior, or poses a danger to themselves or others, with written notice to the parent one week before suspension."
+            )}</p>
+            <p>{tr(
+              "5. يُرجى عدم إحضار الطفل للحضانة في حال مرضه، مع إبلاغ الإدارة بطبيعة المرض. وفي حال ظهرت على الطفل أعراض مرضية أثناء تواجده بالحضانة، سيتم إبلاغ ولي الأمر فوراً لاصطحابه خلال 30 دقيقة من الاتصال.",
+              "5. Please do not bring the child to the nursery while ill, and inform management of the nature of the illness. If symptoms appear while at the nursery, the parent will be notified immediately to collect the child within 30 minutes of the call."
+            )}</p>
+            <p>{tr(
+              "6. في حال وقوع إصابة أو حادث، يُبلَّغ ولي الأمر فوراً، وفي الحالات الطارئة يُنقل الطفل لأقرب مركز طبي أو مستشفى لتلقي الرعاية اللازمة، دون أن تتحمل الحضانة أي مسؤولية عن مضاعفات ناتجة عن حالة صحية لم يُفصح عنها ولي الأمر.",
+              "6. In case of injury or accident, the parent is notified immediately, and in emergencies the child is transferred to the nearest medical center or hospital, without the nursery bearing responsibility for complications resulting from an undisclosed health condition."
+            )}</p>
+            <p>{tr(
+              "7. يلتزم ولي الأمر بإبلاغ الحضانة مسبقاً بأي حساسية أو نظام غذائي خاص بالطفل.",
+              "7. The parent must inform the nursery in advance of any allergy or special dietary requirements."
+            )}</p>
+            <p>{tr(
+              "8. يُتوقع من ولي الأمر التواصل باحترام وتعاون مع طاقم الحضانة، والالتزام بسياساتها وإجراءاتها المعتمدة.",
+              "8. The parent is expected to communicate respectfully and cooperatively with staff, and comply with the nursery's approved policies and procedures."
+            )}</p>
+            <p>{tr(
+              "9. يجب حضور الطفل بالزي الموحد المعتمد من الحضانة، مع إحضار طقم ملابس إضافي ووجبة خفيفة وزجاجة ماء.",
+              "9. The child must attend in the nursery's approved uniform, with an extra set of clothes, a snack, and a water bottle."
+            )}</p>
+            <p>{tr(
+              "10. لا تتحمل الحضانة مسؤولية فقد أو تلف أي مقتنيات ثمينة يحضرها الطفل معه، ويُنصح بكتابة اسم الطفل على أغراضه الشخصية.",
+              "10. The nursery is not responsible for loss or damage of valuable items brought by the child; it's recommended to label the child's belongings with their name."
+            )}</p>
+            <p>{tr(
+              "11. تُطبَّق رسوم تأخير قدرها 20 درهماً عن كل ساعة تأخير في اصطحاب الطفل بعد موعد الانصراف الرسمي، وكذلك في حال التسليم المبكر خارج المواعيد الرسمية.",
+              "11. A late fee of AED 20 applies per hour of delay picking up the child after official dismissal time, and also for early drop-off outside official hours."
+            )}</p>
+            <p>{tr(
+              "12. يجب استكمال جميع المستندات المطلوبة (الصور الشخصية، صور الهويات، كارت التطعيمات) لإتمام إجراءات تسجيل الطفل.",
+              "12. All required documents (personal photos, ID copies, vaccination card) must be completed to finalize registration."
+            )}</p>
+            <p>{tr(
+              "13. في حال رغبة ولي الأمر بسحب الطفل، يجب تقديم إشعار كتابي مسبق للإدارة بمدة لا تقل عن شهر واحد؛ ولا يحق استرداد أي رسوم مدفوعة عن الفترة الجارية.",
+              "13. To withdraw the child, the parent must give management at least one month's written notice; no fees paid for the current period will be refunded."
+            )}</p>
+            <p>{tr(
+              "14. يفوّض ولي الأمر إدارة الحضانة باتخاذ الإجراءات الإسعافية الأولية اللازمة عند الضرورة القصوى، على أن يتم إبلاغه فوراً بذلك.",
+              "14. The parent authorizes management to take necessary first-aid measures in extreme necessity, and will be notified immediately."
+            )}</p>
+            <p>{tr(
+              "15. لن يُسلَّم الطفل إلا لولي الأمر أو لأحد الأشخاص المصرح لهم المذكورين في هذه الاستمارة، مع إبراز الهوية عند الاستلام.",
+              "15. The child will only be released to the parent or an authorized person listed in this form, with ID shown at pickup."
+            )}</p>
+            <p>{tr(
+              "16. يقر ولي الأمر بصحة واكتمال جميع البيانات الواردة في هذه الاستمارة، ويتحمل وحده المسؤولية الكاملة عن أي ضرر ينتج عن عدم الإفصاح عن معلومة جوهرية.",
+              "16. The parent affirms the accuracy and completeness of all information in this form, and bears sole responsibility for any harm from failing to disclose material information."
+            )}</p>
+            <p>{tr(
+              "17. بتسجيل طفلك في مجموعة رعاية الطفل للحضانات، فإنك تقر وتوافق على جميع القواعد والشروط الواردة في هذه الاستمارة، والمتوافقة مع اشتراطات هيئة الشارقة للتعليم الخاص (سبيا) ووزارة تنمية المجتمع.",
+              "17. By registering your child with Child Care Nurseries Group, you acknowledge and agree to all rules and terms in this form, which comply with SPEA (Sharjah Private Education Authority) and Ministry of Community Development requirements."
+            )}</p>
           </div>
           <button onClick={() => set("agree")(!f.agree)} className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-xl p-3">
             <span className={`w-5 h-5 rounded border-2 flex items-center justify-center ${f.agree ? "bg-emerald-500 border-emerald-500" : "border-slate-300"}`}>
@@ -776,9 +1063,9 @@ function RegisterForm({ onBack, showToast, standalone }) {
           <button onClick={next} className="w-full bg-sky-500 text-white font-bold py-2.5 rounded-xl text-sm">{tr("التالي", "Next")}</button>
         ) : (
           <button onClick={submit}
-            disabled={!f.agree || submitting}
-            className={`w-full font-bold py-2.5 rounded-xl text-sm text-white ${f.agree && !submitting ? "bg-emerald-500" : "bg-slate-300"}`}>
-            {submitting ? tr("جارِ الإرسال...", "Submitting...") : tr("إرسال الاستمارة", "Submit form")}
+            disabled={!f.agree || submitting || anyUploading}
+            className={`w-full font-bold py-2.5 rounded-xl text-sm text-white ${f.agree && !submitting && !anyUploading ? "bg-emerald-500" : "bg-slate-300"}`}>
+            {submitting ? tr("جارِ الإرسال...", "Submitting...") : anyUploading ? tr("جارِ رفع الملفات...", "Uploading files...") : tr("إرسال الاستمارة", "Submit form")}
           </button>
         )}
       </div>
@@ -903,6 +1190,106 @@ function MoreMenu({ setMoreView }) {
   );
 }
 
+// ---------------- Admin ----------------
+const ADMIN_EMAIL = "smbkfamily@gmail.com";
+
+function AdminScreen({ showToast, onLogout }) {
+  const { tr } = useLang();
+  const [regs, setRegs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [approvingId, setApprovingId] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("portal_registrations")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (!error) setRegs(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const approve = async (id) => {
+    setApprovingId(id);
+    const { data, error } = await supabase.functions.invoke("approve-registration", { body: { registration_id: id } });
+    setApprovingId(null);
+    if (error) {
+      showToast(tr("حصل خطأ أثناء الموافقة", "Something went wrong approving"));
+      return;
+    }
+    if (data?.email_sent === false) {
+      showToast(tr("تمت الموافقة، لكن لم يصل إيميل للأهل (لازم توثيق الدومين على Resend)", "Approved, but the parent email didn't send (verify a domain on Resend)"));
+    } else {
+      showToast(tr("تمت الموافقة وتم إرسال إيميل لولي الأمر", "Approved and emailed the parent"));
+    }
+    load();
+  };
+
+  const pending = regs.filter((r) => r.status === "pending");
+  const others = regs.filter((r) => r.status !== "pending");
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between px-4 pt-5 pb-3 bg-white border-b border-slate-100">
+        <button onClick={onLogout} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100">
+          <LogOut className="w-4 h-4 text-slate-400" />
+        </button>
+        <p className="font-extrabold text-slate-800 text-sm">{tr("لوحة الإدارة", "Admin Dashboard")}</p>
+        <span className="w-8" />
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {loading && <p className="text-xs text-slate-400 text-center">{tr("جارِ التحميل...", "Loading...")}</p>}
+        {!loading && pending.length === 0 && <p className="text-xs text-slate-400 text-center">{tr("لا توجد طلبات قيد المراجعة", "No pending requests")}</p>}
+        {pending.map((r) => {
+          const branch = BRANCHES.find((b) => b.key === r.branch);
+          const billing = r.documents?.billing;
+          const freqLabel = billing ? tr({ monthly: "شهري", weekly: "أسبوعي", daily: "يومي" }[billing.frequency] || billing.frequency, billing.frequency) : "";
+          return (
+            <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <StatusChip ok={false} label={tr("قيد المراجعة", "Pending")} />
+                <p className="text-sm font-bold text-slate-800">{r.form_data?.name || tr("بدون اسم", "No name")}</p>
+              </div>
+              <p className="text-xs text-slate-500">{branch ? tr(branch.name.ar, branch.name.en) : r.branch}</p>
+              <p className="text-xs text-slate-500" dir="ltr">{r.contact_email}</p>
+              {billing && <p className="text-xs text-slate-500">{tr(`الرسوم: ${billing.recurring_fee} د.إ (${freqLabel})`, `Fee: AED ${billing.recurring_fee} (${freqLabel})`)}</p>}
+              <button onClick={() => approve(r.id)} disabled={approvingId === r.id}
+                className="w-full bg-emerald-500 text-white font-bold py-2 rounded-xl text-sm disabled:opacity-60">
+                {approvingId === r.id ? tr("جارِ الموافقة...", "Approving...") : tr("موافقة", "Approve")}
+              </button>
+            </div>
+          );
+        })}
+        {others.length > 0 && (
+          <>
+            <p className="text-xs font-bold text-slate-400 pt-2">{tr("طلبات سابقة", "Past requests")}</p>
+            {others.map((r) => (
+              <div key={r.id} className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex items-center justify-between">
+                <StatusChip ok={r.status === "approved"} label={r.status === "approved" ? tr("مقبول", "Approved") : r.status} />
+                <p className="text-xs font-bold text-slate-600">{r.form_data?.name || r.contact_email}</p>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PendingApprovalScreen({ onLogout }) {
+  const { tr } = useLang();
+  return (
+    <div className="h-full flex flex-col items-center justify-center px-8 text-center gap-3">
+      <AlertCircle className="w-10 h-10 text-amber-500" />
+      <p className="font-bold text-slate-800 text-sm">{tr("طلب التسجيل لسه قيد المراجعة", "Your registration is still under review")}</p>
+      <p className="text-xs text-slate-400 leading-relaxed">{tr("هتقدري تدخلي على حساب طفلك بعد ما الإدارة توافق على طلب التسجيل.", "You'll be able to access your child's account once management approves the registration.")}</p>
+      <button onClick={onLogout} className="mt-3 text-xs font-bold text-sky-500 bg-sky-50 rounded-full px-4 py-2">{tr("تسجيل الخروج", "Log out")}</button>
+    </div>
+  );
+}
+
 // ---------------- App shell ----------------
 export default function ParentPortalPrototype() {
   const [lang, setLang] = useState("ar");
@@ -912,18 +1299,40 @@ export default function ParentPortalPrototype() {
   const [moreView, setMoreView] = useState(null);
   const [toast, setToast] = useState("");
   const [authChecked, setAuthChecked] = useState(false);
+  const [userEmail, setUserEmail] = useState(null);
+  const [approvalStatus, setApprovalStatus] = useState("checking"); // checking | approved | pending
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(""), 2400); };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setScreen("app");
+      if (data.session) { setScreen("app"); setUserEmail(data.session.user.email); }
       setAuthChecked(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) setScreen("app");
+      if (session) { setScreen("app"); setUserEmail(session.user.email); }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Being logged in isn't enough — a parent only sees real content once one
+  // of their registrations has been approved by the admin.
+  useEffect(() => {
+    if (!userEmail || userEmail === ADMIN_EMAIL) return;
+    setApprovalStatus("checking");
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data.user?.id;
+      if (!uid) { setApprovalStatus("pending"); return; }
+      supabase
+        .from("portal_registrations")
+        .select("id")
+        .eq("parent_user_id", uid)
+        .eq("status", "approved")
+        .limit(1)
+        .then(({ data: rows, error }) => {
+          setApprovalStatus(!error && rows && rows.length > 0 ? "approved" : "pending");
+        });
+    });
+  }, [userEmail]);
 
   const logout = async () => {
     await supabase.auth.signOut();
@@ -959,7 +1368,11 @@ export default function ParentPortalPrototype() {
 
           {screen === "login" && <Login onBack={() => setScreen("landing")} />}
 
-          {screen === "app" && (
+          {screen === "app" && userEmail === ADMIN_EMAIL && <AdminScreen showToast={showToast} onLogout={logout} />}
+
+          {screen === "app" && userEmail && userEmail !== ADMIN_EMAIL && approvalStatus === "pending" && <PendingApprovalScreen onLogout={logout} />}
+
+          {screen === "app" && userEmail && userEmail !== ADMIN_EMAIL && approvalStatus === "approved" && (
             <div className="h-full flex flex-col">
               <div className="flex items-center justify-between px-4 pt-5 pb-3 bg-white border-b border-slate-100">
                 <div className="flex items-center gap-2">
