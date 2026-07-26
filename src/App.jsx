@@ -726,7 +726,59 @@ function RegisterForm({ onBack, showToast, standalone }) {
     tr("الإقرار والتوقيع", "Acknowledgement"),
   ];
 
-  const next = () => setStep((s) => Math.min(s + 1, steps.length - 1));
+  const otherOk = (val, otherVal) => val !== "Other" || !!otherVal;
+  const yesNoDetailOk = (val, detail) => !!val && (val === "no" || !!detail);
+
+  const stepValid = () => {
+    switch (step) {
+      case 0:
+        return !!(f.name && f.nick && f.dob && f.gender &&
+          f.nat && otherOk(f.nat, f.natOther) &&
+          f.religion && otherOk(f.religion, f.religionOther) &&
+          f.lang1 && otherOk(f.lang1, f.lang1Other) &&
+          f.langOther && f.address && f.transport && f.branch);
+      case 1:
+        return !!(f.fName &&
+          f.fNat && otherOk(f.fNat, f.fNatOther) &&
+          f.fLang && otherOk(f.fLang, f.fLangOther) &&
+          f.fId && f.fJob &&
+          f.fCity && otherOk(f.fCity, f.fCityOther) &&
+          f.fHome && f.fMobile && f.fEmail && f.marital);
+      case 2:
+        return !!(f.mName &&
+          f.mNat && otherOk(f.mNat, f.mNatOther) &&
+          f.mLang && otherOk(f.mLang, f.mLangOther) &&
+          f.mId && f.mJob &&
+          f.mCity && otherOk(f.mCity, f.mCityOther) &&
+          f.mHome && f.mMobile && f.mEmail &&
+          (f.marital === "married" || !!f.guardian));
+      case 3:
+        return !!(f.emName && f.emRel && f.emMobile && f.emHome);
+      case 4:
+        return true; // authorized pickup persons are optional
+      case 5:
+        return yesNoDetailOk(f.illness, f.illnessDetail) &&
+          yesNoDetailOk(f.meds, f.medsDetail) &&
+          yesNoDetailOk(f.allergy, f.allergyDetail) &&
+          !!(f.blood && f.vax && f.glasses && f.hearing && f.doctor);
+      case 6:
+        return !!(f.order && f.hobbies && f.colors && f.personality && f.loves && f.fears);
+      case 7:
+        return !!(f.sleepHrs && f.sleepAlone && f.foodLike && f.foodNo && f.pacifier && f.media);
+      case 8:
+        return !!(f.plan && f.transportPlan);
+      case 9:
+        return files.fatherId?.status === "done" && files.motherId?.status === "done" &&
+          files.childPhoto?.status === "done" &&
+          (files.vaxCard?.status === "done" || !!f.vaxPledge);
+      case 10:
+        return !!(f.agree && f.sigName && f.sigId && f.sigDate && f.signatureDataUrl);
+      default:
+        return true;
+    }
+  };
+
+  const next = () => { if (stepValid()) setStep((s) => Math.min(s + 1, steps.length - 1)); };
   const back = () => (step === 0 ? onBack() : setStep((s) => s - 1));
 
   const submit = async () => {
@@ -1134,13 +1186,19 @@ function RegisterForm({ onBack, showToast, standalone }) {
         </>)}
       </div>
 
-      <div className="p-4 pt-2 flex gap-2">
+      <div className="p-4 pt-2 flex flex-col gap-1.5">
+        {!stepValid() && (
+          <p className="text-[11px] text-rose-500 font-bold text-center">{tr("من فضلك املأي كل الحقول قبل المتابعة", "Please fill in all fields before continuing")}</p>
+        )}
         {step < steps.length - 1 ? (
-          <button onClick={next} className="w-full bg-sky-500 text-white font-bold py-2.5 rounded-xl text-sm">{tr("التالي", "Next")}</button>
+          <button onClick={next} disabled={!stepValid()}
+            className={`w-full font-bold py-2.5 rounded-xl text-sm text-white ${stepValid() ? "bg-sky-500" : "bg-slate-300"}`}>
+            {tr("التالي", "Next")}
+          </button>
         ) : (
           <button onClick={submit}
-            disabled={!f.agree || !f.signatureDataUrl || submitting || anyUploading}
-            className={`w-full font-bold py-2.5 rounded-xl text-sm text-white ${f.agree && f.signatureDataUrl && !submitting && !anyUploading ? "bg-emerald-500" : "bg-slate-300"}`}>
+            disabled={!stepValid() || submitting || anyUploading}
+            className={`w-full font-bold py-2.5 rounded-xl text-sm text-white ${stepValid() && !submitting && !anyUploading ? "bg-emerald-500" : "bg-slate-300"}`}>
             {submitting ? tr("جارِ الإرسال...", "Submitting...") : anyUploading ? tr("جارِ رفع الملفات...", "Uploading files...") : tr("إرسال الاستمارة", "Submit form")}
           </button>
         )}
