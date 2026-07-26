@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, useRef, createContext, useContext } from "react";
 import {
   Home, CalendarDays, ClipboardList, Wallet, MoreHorizontal, ChevronLeft,
   Bell, LogOut, Upload, FileText, MessageCircle, CheckCircle2, Circle,
@@ -239,6 +239,65 @@ function FileUploadRow({ label, status, fileName, error, onSelect }) {
         <span className="text-sm text-slate-700 font-bold block">{label}</span>
         {fileName && status !== "error" && <span className="text-[10px] text-slate-400 block truncate">{fileName}</span>}
         {error && <span className="text-[10px] text-rose-500 block">{tr("فشل الرفع، حاولي تاني", "Upload failed, try again")}</span>}
+      </div>
+    </div>
+  );
+}
+function SignaturePad({ onChange, hasSignature }) {
+  const { tr } = useLang();
+  const canvasRef = useRef(null);
+  const drawingRef = useRef(false);
+
+  const getPos = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+  const start = (e) => {
+    drawingRef.current = true;
+    const ctx = canvasRef.current.getContext("2d");
+    const { x, y } = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+  const move = (e) => {
+    if (!drawingRef.current) return;
+    const ctx = canvasRef.current.getContext("2d");
+    const { x, y } = getPos(e);
+    ctx.strokeStyle = "#1e293b";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+  const end = () => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    onChange(canvasRef.current.toDataURL("image/png"));
+  };
+  const clear = () => {
+    const canvas = canvasRef.current;
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+    onChange(null);
+  };
+
+  return (
+    <div>
+      <label className="text-xs font-bold text-slate-500 block mb-1" style={{ textAlign: "right" }}>{tr("توقيع ولي الأمر", "Parent's signature")}</label>
+      <canvas
+        ref={canvasRef}
+        width={300}
+        height={120}
+        className="w-full bg-white border border-slate-200 rounded-xl"
+        style={{ height: 120, touchAction: "none" }}
+        onPointerDown={start}
+        onPointerMove={move}
+        onPointerUp={end}
+        onPointerLeave={end}
+      />
+      <div className="flex items-center justify-between mt-1">
+        <button type="button" onClick={clear} className="text-[11px] text-rose-500 font-bold">{tr("مسح", "Clear")}</button>
+        <span className="text-[11px] text-slate-400">{hasSignature ? tr("تم التوقيع ✓", "Signed ✓") : tr("وقّعي هنا بإصبعك أو الماوس", "Sign here with your finger or mouse")}</span>
       </div>
     </div>
   );
@@ -633,6 +692,12 @@ function RegisterForm({ onBack, showToast, standalone }) {
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
   const setEv = (k) => (e) => set(k)(e.target.value);
   const toggleSkill = (k) => setF((s) => ({ ...s, skills: { ...(s.skills || {}), [k]: !(s.skills || {})[k] } }));
+  const setArrayItem = (key, idx, field) => (e) =>
+    setF((s) => {
+      const arr = [...(s[key] || [])];
+      arr[idx] = { ...arr[idx], [field]: e.target.value };
+      return { ...s, [key]: arr };
+    });
 
   const uploadFile = async (key, file) => {
     setFiles((s) => ({ ...s, [key]: { status: "uploading", name: file.name } }));
@@ -678,6 +743,15 @@ function RegisterForm({ onBack, showToast, standalone }) {
     const weekendFee = freq === "daily" ? 0 : selectedWeekendDays.reduce((sum, d) => sum + (d[freq] || 0), 0);
     const recurringFee = (selectedPlan?.[freq] || 0) + (selectedTransport?.[freq] || 0) + weekendFee;
     const oneTimeFee = ONE_TIME_FEES.registration + ONE_TIME_FEES.stationery + ONE_TIME_FEES.uniform;
+
+    let signaturePath = null;
+    if (f.signatureDataUrl) {
+      const signatureBlob = await (await fetch(f.signatureDataUrl)).blob();
+      const path = `${regId}/signature-${Date.now()}.png`;
+      const { error: sigErr } = await supabase.storage.from("registration-documents").upload(path, signatureBlob, { contentType: "image/png" });
+      if (!sigErr) signaturePath = path;
+    }
+
     const { error } = await supabase.from("portal_registrations").insert({
       branch: selectedBranch?.key || f.branch || null,
       contact_email: contactEmail,
@@ -690,6 +764,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
         child_photo: files.childPhoto?.path || null,
         vaccination_card: files.vaxCard?.path || null,
         vaccination_pledge: !!f.vaxPledge,
+        signature: signaturePath,
         billing: {
           frequency: freq,
           plan_key: selectedPlan?.key || null,
@@ -791,9 +866,9 @@ function RegisterForm({ onBack, showToast, standalone }) {
           <p className="text-xs font-bold text-slate-500">{tr("تفاصيل الإخوة (إن وجدوا)", "Siblings (if any)")}</p>
           {[0, 1, 2].map((i) => (
             <div key={i} className="grid grid-cols-3 gap-1.5">
-              <input placeholder={tr("الاسم", "Name")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
-              <input placeholder={tr("الميلاد", "DOB")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
-              <input placeholder={tr("المدرسة", "School")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
+              <input placeholder={tr("الاسم", "Name")} value={f.siblings?.[i]?.name || ""} onChange={setArrayItem("siblings", i, "name")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
+              <input placeholder={tr("الميلاد", "DOB")} value={f.siblings?.[i]?.dob || ""} onChange={setArrayItem("siblings", i, "dob")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
+              <input placeholder={tr("المدرسة", "School")} value={f.siblings?.[i]?.school || ""} onChange={setArrayItem("siblings", i, "school")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
             </div>
           ))}
           <div className="h-px bg-slate-100 my-1" />
@@ -811,12 +886,12 @@ function RegisterForm({ onBack, showToast, standalone }) {
           {[0, 1, 2].map((i) => (
             <div key={i} className="bg-white border border-slate-100 rounded-xl p-3 space-y-1.5">
               <p className="text-[11px] font-bold text-slate-400">{tr(`الشخص ${i + 1}`, `Person ${i + 1}`)}</p>
-              <input placeholder={tr("الاسم", "Name")} className="w-full border border-slate-200 rounded-lg px-2 py-2 text-xs" />
+              <input placeholder={tr("الاسم", "Name")} value={f.pickupPersons?.[i]?.name || ""} onChange={setArrayItem("pickupPersons", i, "name")} className="w-full border border-slate-200 rounded-lg px-2 py-2 text-xs" />
               <div className="grid grid-cols-2 gap-1.5">
-                <input placeholder={tr("صلة القرابة", "Relationship")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
-                <input placeholder={tr("رقم الهاتف", "Phone")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
+                <input placeholder={tr("صلة القرابة", "Relationship")} value={f.pickupPersons?.[i]?.relation || ""} onChange={setArrayItem("pickupPersons", i, "relation")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
+                <input placeholder={tr("رقم الهاتف", "Phone")} value={f.pickupPersons?.[i]?.phone || ""} onChange={setArrayItem("pickupPersons", i, "phone")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
               </div>
-              <input placeholder={tr("رقم الهوية", "ID number")} className="w-full border border-slate-200 rounded-lg px-2 py-2 text-xs" />
+              <input placeholder={tr("رقم الهوية", "ID number")} value={f.pickupPersons?.[i]?.idNumber || ""} onChange={setArrayItem("pickupPersons", i, "idNumber")} className="w-full border border-slate-200 rounded-lg px-2 py-2 text-xs" />
             </div>
           ))}
         </>)}
@@ -1052,9 +1127,10 @@ function RegisterForm({ onBack, showToast, standalone }) {
             </span>
             <span className="text-xs font-bold text-slate-700">{tr("أوافق على جميع الشروط والأحكام", "I agree to all terms & conditions")}</span>
           </button>
-          <Field label={tr("اسم ولي الأمر (توقيع إلكتروني)", "Parent name (e-signature)")} value={f.sigName} onChange={setEv("sigName")} />
+          <Field label={tr("اسم ولي الأمر", "Parent name")} value={f.sigName} onChange={setEv("sigName")} />
           <Field label={tr("رقم الهوية الإماراتية", "Emirates ID number")} value={f.sigId} onChange={setEv("sigId")} />
           <Field label={tr("التاريخ", "Date")} type="date" value={f.sigDate} onChange={setEv("sigDate")} />
+          <SignaturePad hasSignature={!!f.signatureDataUrl} onChange={(dataUrl) => set("signatureDataUrl")(dataUrl)} />
         </>)}
       </div>
 
@@ -1063,8 +1139,8 @@ function RegisterForm({ onBack, showToast, standalone }) {
           <button onClick={next} className="w-full bg-sky-500 text-white font-bold py-2.5 rounded-xl text-sm">{tr("التالي", "Next")}</button>
         ) : (
           <button onClick={submit}
-            disabled={!f.agree || submitting || anyUploading}
-            className={`w-full font-bold py-2.5 rounded-xl text-sm text-white ${f.agree && !submitting && !anyUploading ? "bg-emerald-500" : "bg-slate-300"}`}>
+            disabled={!f.agree || !f.signatureDataUrl || submitting || anyUploading}
+            className={`w-full font-bold py-2.5 rounded-xl text-sm text-white ${f.agree && f.signatureDataUrl && !submitting && !anyUploading ? "bg-emerald-500" : "bg-slate-300"}`}>
             {submitting ? tr("جارِ الإرسال...", "Submitting...") : anyUploading ? tr("جارِ رفع الملفات...", "Uploading files...") : tr("إرسال الاستمارة", "Submit form")}
           </button>
         )}
