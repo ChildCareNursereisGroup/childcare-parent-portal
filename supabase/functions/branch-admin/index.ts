@@ -249,6 +249,33 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    if (action === "delete_registration") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      const { registration_id } = body;
+      const { data: reg, error: regErr } = await admin
+        .from("portal_registrations")
+        .select("documents")
+        .eq("id", registration_id)
+        .eq("branch", branch)
+        .single();
+      if (regErr || !reg) return json({ error: "الملف غير موجود" }, 404);
+
+      const docs = reg.documents || {};
+      const paths = DOC_KEYS.map((k) => docs[k]).filter((p): p is string => typeof p === "string" && p.length > 0);
+      if (paths.length) {
+        await admin.storage.from("registration-documents").remove(paths);
+      }
+
+      const { error } = await admin
+        .from("portal_registrations")
+        .delete()
+        .eq("id", registration_id)
+        .eq("branch", branch);
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true });
+    }
+
     if (action === "list_reports") {
       const branch = await requireBranchSession(body.token);
       if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);

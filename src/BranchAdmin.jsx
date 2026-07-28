@@ -139,6 +139,7 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
   const lang = tr("ar", "en") === "ar" ? "ar" : "en";
   const [approving, setApproving] = useState(false);
   const [settingStatus, setSettingStatus] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [classSel, setClassSel] = useState(reg.class_id || "");
   const [newClassName, setNewClassName] = useState("");
   const [savingClass, setSavingClass] = useState(false);
@@ -194,6 +195,19 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
     setSettingStatus(false);
     if (error || data?.error) { showToast(tr("حصل خطأ", "Something went wrong")); return; }
     showToast(status === "stopped" ? tr("تم إيقاف تسجيل الطفل", "Child withdrawn") : tr("تم إعادة التفعيل", "Reactivated"));
+    onChanged();
+  };
+
+  const deleteRegistration = async () => {
+    const name = f.name || tr("الطفل ده", "this child");
+    if (!window.confirm(tr(`متأكدة إنك عايزة تمسحي ملف ${name} نهائيًا؟ هيتمسح كل بياناته ومستنداته وتقاريره ومفيش رجعة في القرار ده.`, `Are you sure you want to permanently delete ${name}'s file? All their data, documents, and reports will be deleted — this cannot be undone.`))) return;
+    if (!window.confirm(tr("تأكيد أخير: هل إنتِ متأكدة 100%؟", "Final check: are you 100% sure?"))) return;
+    setDeleting(true);
+    const { data, error } = await supabase.functions.invoke("branch-admin", { body: { action: "delete_registration", token, registration_id: reg.id } });
+    setDeleting(false);
+    if (error || data?.error) { showToast(tr("حصل خطأ أثناء المسح", "Delete failed")); return; }
+    showToast(tr("تم مسح ملف الطفل", "Child file deleted"));
+    onClose();
     onChanged();
   };
 
@@ -389,6 +403,10 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
             </div>
           )}
         </div>
+
+        <button onClick={deleteRegistration} disabled={deleting} className="w-full bg-white text-rose-500 border border-rose-200 font-bold py-2.5 rounded-xl text-xs disabled:opacity-60">
+          {deleting ? tr("جارِ المسح...", "Deleting...") : tr("🗑 مسح ملف الطفل نهائيًا", "🗑 Permanently delete this child's file")}
+        </button>
       </div>
     </div>
   );
