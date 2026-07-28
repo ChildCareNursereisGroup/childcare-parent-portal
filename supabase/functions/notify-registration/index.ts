@@ -11,7 +11,7 @@ const FIELD_LABELS: Record<string, string> = {
   fName: "اسم الأب", fNat: "جنسية الأب", fId: "هوية/جواز الأب", fJob: "وظيفة الأب",
   fCity: "مدينة الأب", fHome: "هاتف منزل الأب", fMobile: "جوال الأب", fEmail: "إيميل الأب", marital: "الحالة الاجتماعية",
   mName: "اسم الأم", mNat: "جنسية الأم", mId: "هوية/جواز الأم", mJob: "وظيفة الأم",
-  mCity: "مدينة الأم", mHome: "هاتف منزل الأم", mMobile: "جوال الأم", mEmail: "إيميل الأم", guardian: "الحاضن الشرعي",
+  mCity: "مدينة الأم", mHome: "هاتف منزل الأم", mMobile: "جوال الأم", mEmail: "إيميل الأم",
   emName: "اسم جهة الطوارئ", emRel: "صلة القرابة", emMobile: "جوال الطوارئ", emHome: "هاتف الطوارئ",
   illness: "مرض مزمن", illnessDetail: "تفاصيل المرض", meds: "أدوية منتظمة", medsDetail: "تفاصيل الأدوية",
   allergy: "حساسية", allergyDetail: "تفاصيل الحساسية", blood: "فصيلة الدم", vax: "التطعيمات مكتملة",

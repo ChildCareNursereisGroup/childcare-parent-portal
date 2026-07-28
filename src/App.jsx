@@ -72,11 +72,18 @@ const FREQUENCIES = [
   { key: "weekly", label: { ar: "أسبوعي", en: "Weekly" } },
   { key: "daily", label: { ar: "يومي", en: "Daily" } },
 ];
+const PLAN_TIMES = [
+  { key: "8", label: { ar: "٨:٠٠ ص", en: "8:00 AM" } },
+  { key: "11", label: { ar: "١١:٠٠ ص", en: "11:00 AM" } },
+  { key: "13", label: { ar: "١:٠٠ م", en: "1:00 PM" } },
+  { key: "15", label: { ar: "٣:٠٠ م", en: "3:00 PM" } },
+  { key: "17", label: { ar: "٥:٠٠ م", en: "5:00 PM" } },
+];
 const PLANS = [
-  { key: "slot_8_11", label: { ar: "الاثنين - الخميس · ٨:٠٠ ص - ١١:٠٠ ص", en: "Mon-Thu · 8:00-11:00" }, monthly: 800, weekly: 250, daily: 60 },
-  { key: "slot_11_3", label: { ar: "الاثنين - الخميس · ١١:٠٠ ص - ٣:٠٠ م", en: "Mon-Thu · 11:00-3:00" }, monthly: 1000, weekly: 350, daily: 80 },
-  { key: "slot_8_1", label: { ar: "الاثنين - الخميس · ٨:٠٠ ص - ١:٠٠ م (+ساعة إضافية ١٠٠ د.إ)", en: "Mon-Thu · 8:00-1:00 (+AED100/extra hour)" }, monthly: 1100, weekly: 360, daily: 100 },
-  { key: "slot_1_5", label: { ar: "الاثنين - الخميس · ١:٠٠ م - ٥:٠٠ م", en: "Mon-Thu · 1:00-5:00" }, monthly: 800, weekly: 250, daily: 80 },
+  { key: "slot_8_11", from: "8", to: "11", label: { ar: "الاثنين - الخميس · ٨:٠٠ ص - ١١:٠٠ ص", en: "Mon-Thu · 8:00-11:00" }, monthly: 800, weekly: 250, daily: 60 },
+  { key: "slot_11_15", from: "11", to: "15", label: { ar: "الاثنين - الخميس · ١١:٠٠ ص - ٣:٠٠ م", en: "Mon-Thu · 11:00-3:00" }, monthly: 1000, weekly: 350, daily: 80 },
+  { key: "slot_8_13", from: "8", to: "13", label: { ar: "الاثنين - الخميس · ٨:٠٠ ص - ١:٠٠ م (+ساعة إضافية ١٠٠ د.إ)", en: "Mon-Thu · 8:00-1:00 (+AED100/extra hour)" }, monthly: 1100, weekly: 360, daily: 100 },
+  { key: "slot_13_17", from: "13", to: "17", label: { ar: "الاثنين - الخميس · ١:٠٠ م - ٥:٠٠ م", en: "Mon-Thu · 1:00-5:00" }, monthly: 800, weekly: 250, daily: 80 },
 ];
 const TRANSPORT_OPTIONS = [
   { key: "none", label: { ar: "بدون مواصلات", en: "No transportation" }, monthly: 0, weekly: 0, daily: 0 },
@@ -804,8 +811,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
           f.mLang && otherOk(f.mLang, f.mLangOther) &&
           f.mId && f.mJob &&
           f.mCity && otherOk(f.mCity, f.mCityOther) &&
-          f.mHome && f.mMobile && f.mEmail &&
-          (f.marital === "married" || !!f.guardian));
+          f.mHome && f.mMobile && f.mEmail);
       case 3:
         return !!(f.emName && f.emRel && f.emMobile && f.emHome);
       case 4:
@@ -965,7 +971,6 @@ function RegisterForm({ onBack, showToast, standalone }) {
           <Field label={tr("هاتف المنزل", "Home phone")} value={f.mHome} onChange={setEv("mHome")} />
           <Field label={tr("رقم الهاتف المتحرك", "Mobile number")} value={f.mMobile} onChange={setEv("mMobile")} />
           <Field label={tr("البريد الإلكتروني", "Email")} value={f.mEmail} onChange={setEv("mEmail")} />
-          <Field label={tr("الحاضن الشرعي (إن انفصلا)", "Legal guardian (if separated)")} value={f.guardian} onChange={setEv("guardian")} />
         </>)}
 
         {step === 3 && (<>
@@ -1062,18 +1067,46 @@ function RegisterForm({ onBack, showToast, standalone }) {
           </div>
 
           <p className="text-xs font-bold text-slate-500 pt-2">{tr("خطة الدوام (الاثنين - الخميس)", "Attendance plan (Mon-Thu)")}</p>
-          <div className="space-y-2">
-            {PLANS.map((p) => {
-              const freq = f.frequency || "monthly";
-              return (
-                <button key={p.key} type="button" onClick={() => set("plan")(p.key)}
-                  className={`w-full flex items-center justify-between rounded-xl border p-3 text-right ${f.plan === p.key ? "bg-sky-50 border-sky-400" : "bg-white border-slate-200"}`}>
-                  <span className="text-xs font-bold text-slate-800 shrink-0">{tr(`${p[freq]} د.إ`, `AED ${p[freq]}`)}</span>
-                  <span className="text-xs font-bold text-slate-600">{tr(p.label.ar, p.label.en)}</span>
-                </button>
-              );
-            })}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[11px] text-slate-400 block mb-1">{tr("من الساعة", "From")}</label>
+              <select value={f.planFrom || ""} onChange={(e) => {
+                const from = e.target.value;
+                setF((s) => {
+                  const match = PLANS.find((p) => p.from === from && p.to === s.planTo);
+                  return { ...s, planFrom: from, plan: match ? match.key : "" };
+                });
+              }} className="w-full border border-slate-200 rounded-xl px-2 py-2 text-xs">
+                <option value="">—</option>
+                {PLAN_TIMES.map((t) => (<option key={t.key} value={t.key}>{tr(t.label.ar, t.label.en)}</option>))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-slate-400 block mb-1">{tr("إلى الساعة", "To")}</label>
+              <select value={f.planTo || ""} onChange={(e) => {
+                const to = e.target.value;
+                setF((s) => {
+                  const match = PLANS.find((p) => p.from === s.planFrom && p.to === to);
+                  return { ...s, planTo: to, plan: match ? match.key : "" };
+                });
+              }} className="w-full border border-slate-200 rounded-xl px-2 py-2 text-xs">
+                <option value="">—</option>
+                {PLAN_TIMES.map((t) => (<option key={t.key} value={t.key}>{tr(t.label.ar, t.label.en)}</option>))}
+              </select>
+            </div>
           </div>
+          {f.planFrom && f.planTo && (() => {
+            const freq = f.frequency || "monthly";
+            const matched = PLANS.find((p) => p.from === f.planFrom && p.to === f.planTo);
+            return matched ? (
+              <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 flex items-center justify-between">
+                <span className="text-xs font-bold text-sky-700">{tr(`${matched[freq]} د.إ`, `AED ${matched[freq]}`)}</span>
+                <span className="text-xs text-sky-600">{tr(matched.label.ar, matched.label.en)}</span>
+              </div>
+            ) : (
+              <p className="text-xs text-rose-500 font-bold">{tr("الميعاد ده مش متاح، اختاري ميعاد تاني", "This schedule isn't available, pick another time")}</p>
+            );
+          })()}
 
           <p className="text-xs font-bold text-slate-500 pt-2">{tr("المواصلات", "Transportation")}</p>
           <div className="flex gap-1.5 flex-wrap justify-end">
