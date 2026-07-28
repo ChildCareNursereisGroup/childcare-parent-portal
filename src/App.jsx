@@ -380,6 +380,8 @@ function Login({ onBack }) {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   const sendLink = async () => {
     setError("");
@@ -398,6 +400,24 @@ function Login({ onBack }) {
       return;
     }
     setSent(true);
+  };
+
+  const verifyCode = async () => {
+    setError("");
+    if (!code || code.trim().length < 6) {
+      setError(tr("أدخلي الكود المكوّن من 6 أرقام", "Enter the 6-digit code"));
+      return;
+    }
+    setVerifying(true);
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token: code.trim(),
+      type: "email",
+    });
+    setVerifying(false);
+    if (verifyError) {
+      setError(tr("الكود غير صحيح أو منتهي، جرّبي تطلبي كود جديد", "Incorrect or expired code — try requesting a new one"));
+    }
   };
 
   return (
@@ -431,7 +451,16 @@ function Login({ onBack }) {
         <div className="w-full bg-white rounded-2xl p-5 shadow-xl text-center">
           <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
           <p className="text-sm text-slate-700 font-bold mb-1">{tr("تم إرسال رابط الدخول", "Login link sent")}</p>
-          <p className="text-xs text-slate-400">{tr("افتحي بريدك الإلكتروني واضغطي على الرابط للدخول تلقائياً", "Check your email and tap the link to sign in automatically")}</p>
+          <p className="text-xs text-slate-400 mb-4">{tr("افتحي بريدك الإلكتروني واضغطي على الرابط للدخول تلقائياً", "Check your email and tap the link to sign in automatically")}</p>
+          <div className="border-t border-slate-100 pt-4">
+            <p className="text-xs text-slate-400 mb-2">{tr("أو أدخلي الكود المكوّن من 6 أرقام من نفس الإيميل", "Or enter the 6-digit code from the same email")}</p>
+            <input type="text" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-3 text-center tracking-[0.3em] font-bold focus:outline-none focus:ring-2 focus:ring-sky-400" />
+            {error && <p className="text-xs text-rose-500 font-bold mb-3">{error}</p>}
+            <button onClick={verifyCode} disabled={verifying} className="w-full bg-sky-500 text-white font-bold py-2.5 rounded-xl text-sm hover:bg-sky-600 transition disabled:opacity-60">
+              {verifying ? tr("جارِ التحقق...", "Verifying...") : tr("تأكيد الكود", "Confirm code")}
+            </button>
+          </div>
         </div>
       )}
     </div>
