@@ -51,12 +51,21 @@ function renderFormSummary(formData: Record<string, unknown>): string {
   `;
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 async function fetchAttachment(admin: ReturnType<typeof createClient>, path: string | null | undefined, filename: string) {
   if (!path) return null;
   const { data, error } = await admin.storage.from("registration-documents").download(path);
   if (error || !data) return null;
   const buf = await data.arrayBuffer();
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const base64 = bytesToBase64(new Uint8Array(buf));
   return { filename, content: base64 };
 }
 
@@ -64,7 +73,7 @@ async function sendEmail(resendKey: string, to: string, subject: string, html: s
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: "Parent Portal <onboarding@resend.dev>", to, subject, html, attachments }),
+    body: JSON.stringify({ from: "مجموعة رعاية الطفل للحضانات <login@childcareuae.com>", to, subject, html, attachments }),
   });
   return res.ok;
 }

@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: "Parent Portal <onboarding@resend.dev>",
+          from: "مجموعة رعاية الطفل للحضانات <login@childcareuae.com>",
           to: reg.contact_email,
           subject: "تمت الموافقة على تسجيل طفلك",
           html: `<div dir="rtl" style="font-family: sans-serif; line-height: 1.8;"><p>تمت الموافقة على طلب تسجيل طفلك في مجموعة رعاية الطفل للحضانات.</p><p>افتحي بوابة أولياء الأمور واطلبي رابط الدخول بنفس البريد الإلكتروني ده.</p></div>`,
