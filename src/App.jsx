@@ -654,29 +654,37 @@ function ReportsScreen({ registrationId }) {
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <div className="flex items-center gap-2 mb-2">
-          <UtensilsCrossed className="w-4 h-4 text-emerald-500" />
-          <p className="font-bold text-slate-800 text-sm">{tr("الأكل والشرب", "Food & drink")}</p>
+      {r.absent ? (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 text-center">
+          <p className="text-sm font-bold text-slate-600">{tr("طفلك كان غايب في اليوم ده", "Your child was absent this day")}</p>
         </div>
-        <p className="text-xs text-slate-600 leading-relaxed">{r.meals || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
-      </div>
+      ) : (
+        <>
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-2 mb-2">
+              <UtensilsCrossed className="w-4 h-4 text-emerald-500" />
+              <p className="font-bold text-slate-800 text-sm">{tr("الأكل والشرب", "Food & drink")}</p>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">{r.meals || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
+          </div>
 
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <div className="flex items-center gap-2 mb-2">
-          <Moon className="w-4 h-4 text-indigo-500" />
-          <p className="font-bold text-slate-800 text-sm">{tr("النوم", "Sleep")}</p>
-        </div>
-        <p className="text-xs text-slate-600 leading-relaxed">{r.sleep || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
-      </div>
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-2 mb-2">
+              <Moon className="w-4 h-4 text-indigo-500" />
+              <p className="font-bold text-slate-800 text-sm">{tr("النوم", "Sleep")}</p>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">{r.sleep || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
+          </div>
 
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <div className="flex items-center gap-2 mb-2">
-          <Smile className="w-4 h-4 text-amber-500" />
-          <p className="font-bold text-slate-800 text-sm">{tr("النشاط والمزاج", "Activity & mood")}</p>
-        </div>
-        <p className="text-xs text-slate-600 leading-relaxed">{r.activity || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
-      </div>
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-2 mb-2">
+              <Smile className="w-4 h-4 text-amber-500" />
+              <p className="font-bold text-slate-800 text-sm">{tr("النشاط والمزاج", "Activity & mood")}</p>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">{r.activity || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
+          </div>
+        </>
+      )}
 
       {r.notes && (
         <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100 space-y-2">
@@ -1520,13 +1528,22 @@ function AdminScreen({ showToast, onLogout }) {
   );
 }
 
-function PendingApprovalScreen({ onLogout }) {
+function PendingApprovalScreen({ onLogout, stopped }) {
   const { tr } = useLang();
   return (
     <div className="h-full flex flex-col items-center justify-center px-8 text-center gap-3">
       <AlertCircle className="w-10 h-10 text-amber-500" />
-      <p className="font-bold text-slate-800 text-sm">{tr("طلب التسجيل لسه قيد المراجعة", "Your registration is still under review")}</p>
-      <p className="text-xs text-slate-400 leading-relaxed">{tr("هتقدري تدخلي على حساب طفلك بعد ما الإدارة توافق على طلب التسجيل.", "You'll be able to access your child's account once management approves the registration.")}</p>
+      {stopped ? (
+        <>
+          <p className="font-bold text-slate-800 text-sm">{tr("تسجيل طفلك متوقف حالياً", "Your child's registration is currently withdrawn")}</p>
+          <p className="text-xs text-slate-400 leading-relaxed">{tr("تواصلي مع إدارة الفرع لو محتاجة تفعّلي الحساب تاني.", "Contact the branch if you'd like the account reactivated.")}</p>
+        </>
+      ) : (
+        <>
+          <p className="font-bold text-slate-800 text-sm">{tr("طلب التسجيل لسه قيد المراجعة", "Your registration is still under review")}</p>
+          <p className="text-xs text-slate-400 leading-relaxed">{tr("هتقدري تدخلي على حساب طفلك بعد ما الإدارة توافق على طلب التسجيل.", "You'll be able to access your child's account once management approves the registration.")}</p>
+        </>
+      )}
       <button onClick={onLogout} className="mt-3 text-xs font-bold text-sky-500 bg-sky-50 rounded-full px-4 py-2">{tr("تسجيل الخروج", "Log out")}</button>
     </div>
   );
@@ -1559,7 +1576,8 @@ export default function ParentPortalPrototype() {
   }, []);
 
   // Being logged in isn't enough — a parent only sees real content once one
-  // of their registrations has been approved by the admin.
+  // of their registrations has been approved by the admin, and loses access
+  // again if the branch marks the child as withdrawn ("stopped").
   useEffect(() => {
     if (!userEmail || userEmail === ADMIN_EMAIL) return;
     setApprovalStatus("checking");
@@ -1568,13 +1586,13 @@ export default function ParentPortalPrototype() {
       if (!uid) { setApprovalStatus("pending"); return; }
       supabase
         .from("portal_registrations")
-        .select("id")
+        .select("id, status")
         .eq("parent_user_id", uid)
-        .eq("status", "approved")
-        .limit(1)
         .then(({ data: rows, error }) => {
-          setApprovalStatus(!error && rows && rows.length > 0 ? "approved" : "pending");
-          setMyRegistrationId(!error && rows && rows.length > 0 ? rows[0].id : null);
+          const approvedRow = !error && rows ? rows.find((r) => r.status === "approved") : null;
+          const stoppedRow = !error && rows ? rows.find((r) => r.status === "stopped") : null;
+          setApprovalStatus(approvedRow ? "approved" : stoppedRow ? "stopped" : "pending");
+          setMyRegistrationId(approvedRow ? approvedRow.id : null);
         });
     });
   }, [userEmail]);
@@ -1624,6 +1642,8 @@ export default function ParentPortalPrototype() {
           {screen === "app" && userEmail === ADMIN_EMAIL && <AdminScreen showToast={showToast} onLogout={logout} />}
 
           {screen === "app" && userEmail && userEmail !== ADMIN_EMAIL && approvalStatus === "pending" && <PendingApprovalScreen onLogout={logout} />}
+
+          {screen === "app" && userEmail && userEmail !== ADMIN_EMAIL && approvalStatus === "stopped" && <PendingApprovalScreen onLogout={logout} stopped />}
 
           {screen === "app" && userEmail && userEmail !== ADMIN_EMAIL && approvalStatus === "approved" && (
             <div className="h-full flex flex-col">

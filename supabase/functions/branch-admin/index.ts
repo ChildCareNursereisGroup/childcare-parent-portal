@@ -207,7 +207,7 @@ Deno.serve(async (req) => {
     if (action === "save_report") {
       const branch = await requireBranchSession(body.token);
       if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
-      const { registration_id, report_date, meals, sleep, activity, notes } = body;
+      const { registration_id, report_date, meals, sleep, activity, notes, absent } = body;
       const { data: reg, error: regErr } = await admin
         .from("portal_registrations")
         .select("id, parent_user_id")
@@ -222,14 +222,29 @@ Deno.serve(async (req) => {
           parent_user_id: reg.parent_user_id,
           branch,
           report_date: report_date || new Date().toISOString().slice(0, 10),
-          meals: meals || null,
-          sleep: sleep || null,
-          activity: activity || null,
+          absent: !!absent,
+          meals: absent ? null : meals || null,
+          sleep: absent ? null : sleep || null,
+          activity: absent ? null : activity || null,
           notes: notes || null,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "registration_id,report_date" }
       );
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true });
+    }
+
+    if (action === "set_status") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      const { registration_id, status } = body;
+      if (!["approved", "stopped"].includes(status)) return json({ error: "حالة غير معروفة" }, 400);
+      const { error } = await admin
+        .from("portal_registrations")
+        .update({ status })
+        .eq("id", registration_id)
+        .eq("branch", branch);
       if (error) return json({ error: error.message }, 500);
       return json({ ok: true });
     }

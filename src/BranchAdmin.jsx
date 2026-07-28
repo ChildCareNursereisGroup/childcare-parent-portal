@@ -50,8 +50,21 @@ const KEY_LABELS = {
 
 const SKIP_KEYS = new Set(["signatureDataUrl", "branch"]);
 
+const MEAL_OPTIONS = { ar: ["أكل الكل", "أكل جزء", "رفض الأكل", "شرب مية كويس", "شرب مية قليل"], en: ["Ate all", "Ate some", "Refused food", "Drank water well", "Drank little water"] };
+const SLEEP_OPTIONS = { ar: ["نام كويس", "نام شوية", "مانامش خالص"], en: ["Slept well", "Slept a little", "Didn't sleep at all"] };
+const ACTIVITY_OPTIONS = { ar: ["مبسوط", "هادي", "متضايق", "نشيط", "لعب مع الأصدقاء", "رسم", "أنشطة حركية", "موسيقى"], en: ["Happy", "Calm", "Upset", "Energetic", "Played with friends", "Drawing", "Physical activity", "Music"] };
+
 function humanizeKey(key) {
   return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+}
+
+function Chip({ label, active, onClick }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`text-[11px] font-bold px-2.5 py-1.5 rounded-full border ${active ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-500 border-slate-200"}`}>
+      {label}
+    </button>
+  );
 }
 
 export function BranchLogin({ tr, onBack, onLoggedIn }) {
@@ -109,12 +122,13 @@ export function BranchLogin({ tr, onBack, onLoggedIn }) {
 
 function StatusChip({ status, tr }) {
   const map = {
-    pending: { ok: false, label: tr("قيد المراجعة", "Pending") },
-    approved: { ok: true, label: tr("مقبول", "Approved") },
+    pending: { color: "bg-amber-100 text-amber-600", label: tr("قيد المراجعة", "Pending") },
+    approved: { color: "bg-emerald-100 text-emerald-600", label: tr("مقبول", "Approved") },
+    stopped: { color: "bg-rose-100 text-rose-600", label: tr("متوقف عن الحضانة", "Withdrawn") },
   };
-  const s = map[status] || { ok: false, label: status };
+  const s = map[status] || { color: "bg-amber-100 text-amber-600", label: status };
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.ok ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600"}`}>
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.color}`}>
       {s.label}
     </span>
   );
@@ -122,14 +136,17 @@ function StatusChip({ status, tr }) {
 
 function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast }) {
   const f = reg.form_data || {};
+  const lang = tr("ar", "en") === "ar" ? "ar" : "en";
   const [approving, setApproving] = useState(false);
+  const [settingStatus, setSettingStatus] = useState(false);
   const [classSel, setClassSel] = useState(reg.class_id || "");
   const [newClassName, setNewClassName] = useState("");
   const [savingClass, setSavingClass] = useState(false);
   const [reportDate, setReportDate] = useState(new Date().toISOString().slice(0, 10));
-  const [meals, setMeals] = useState("");
-  const [sleep, setSleep] = useState("");
-  const [activity, setActivity] = useState("");
+  const [absent, setAbsent] = useState(false);
+  const [mealsSel, setMealsSel] = useState([]);
+  const [sleepSel, setSleepSel] = useState("");
+  const [activitySel, setActivitySel] = useState([]);
   const [notes, setNotes] = useState("");
   const [savingReport, setSavingReport] = useState(false);
   const [reports, setReports] = useState([]);
@@ -140,12 +157,43 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
       .then(({ data }) => setReports(data?.reports || []));
   }, [reg.id]);
 
+  useEffect(() => {
+    const existing = reports.find((r) => r.report_date === reportDate);
+    if (existing) {
+      setAbsent(!!existing.absent);
+      setMealsSel(existing.meals ? existing.meals.split("، ").filter((x) => MEAL_OPTIONS.ar.includes(x) || MEAL_OPTIONS.en.includes(x)) : []);
+      setSleepSel(existing.sleep || "");
+      setActivitySel(existing.activity ? existing.activity.split("، ").filter((x) => ACTIVITY_OPTIONS.ar.includes(x) || ACTIVITY_OPTIONS.en.includes(x)) : []);
+      setNotes(existing.notes || "");
+    } else {
+      setAbsent(false);
+      setMealsSel([]);
+      setSleepSel("");
+      setActivitySel([]);
+      setNotes("");
+    }
+  }, [reportDate, reports]);
+
+  const toggleFrom = (arr, setArr, value) => {
+    setArr(arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value]);
+  };
+
   const approve = async () => {
     setApproving(true);
     const { data, error } = await supabase.functions.invoke("branch-admin", { body: { action: "approve", token, registration_id: reg.id } });
     setApproving(false);
     if (error || data?.error) { showToast(tr("حصل خطأ أثناء الموافقة", "Approval failed")); return; }
     showToast(tr("تمت الموافقة", "Approved"));
+    onChanged();
+  };
+
+  const setStatus = async (status) => {
+    if (status === "stopped" && !window.confirm(tr("متأكدة إنك عايزة توقفي تسجيل الطفل ده؟ الأهل مش هيقدروا يشوفوا بياناته بعد كده.", "Are you sure you want to withdraw this child? Parents will lose access to their data."))) return;
+    setSettingStatus(true);
+    const { data, error } = await supabase.functions.invoke("branch-admin", { body: { action: "set_status", token, registration_id: reg.id, status } });
+    setSettingStatus(false);
+    if (error || data?.error) { showToast(tr("حصل خطأ", "Something went wrong")); return; }
+    showToast(status === "stopped" ? tr("تم إيقاف تسجيل الطفل", "Child withdrawn") : tr("تم إعادة التفعيل", "Reactivated"));
     onChanged();
   };
 
@@ -164,11 +212,21 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
   const saveReport = async () => {
     setSavingReport(true);
     const { data, error } = await supabase.functions.invoke("branch-admin", {
-      body: { action: "save_report", token, registration_id: reg.id, report_date: reportDate, meals, sleep, activity, notes },
+      body: {
+        action: "save_report",
+        token,
+        registration_id: reg.id,
+        report_date: reportDate,
+        absent,
+        meals: mealsSel.join("، "),
+        sleep: sleepSel,
+        activity: activitySel.join("، "),
+        notes,
+      },
     });
     setSavingReport(false);
     if (error || data?.error) { showToast(tr("حصل خطأ في حفظ التقرير", "Failed to save report")); return; }
-    showToast(tr("تم حفظ تقرير اليوم", "Today's report saved"));
+    showToast(tr("تم حفظ التقرير", "Report saved"));
     supabase.functions.invoke("branch-admin", { body: { action: "list_reports", token, registration_id: reg.id } })
       .then(({ data }) => setReports(data?.reports || []));
   };
@@ -195,6 +253,18 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
         {reg.status === "pending" && (
           <button onClick={approve} disabled={approving} className="w-full bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-60">
             {approving ? tr("جارِ الموافقة...", "Approving...") : tr("✓ موافقة على التسجيل", "✓ Approve registration")}
+          </button>
+        )}
+
+        {reg.status === "approved" && (
+          <button onClick={() => setStatus("stopped")} disabled={settingStatus} className="w-full bg-rose-50 text-rose-600 border border-rose-200 font-bold py-2.5 rounded-xl text-sm disabled:opacity-60">
+            {settingStatus ? tr("جارِ الحفظ...", "Saving...") : tr("⛔ إيقاف تسجيل الطفل (توقف عن الحضانة)", "⛔ Withdraw child from nursery")}
+          </button>
+        )}
+
+        {reg.status === "stopped" && (
+          <button onClick={() => setStatus("approved")} disabled={settingStatus} className="w-full bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-60">
+            {settingStatus ? tr("جارِ الحفظ...", "Saving...") : tr("✅ إعادة تفعيل تسجيل الطفل", "✅ Reactivate child")}
           </button>
         )}
 
@@ -262,36 +332,58 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
 
         <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-slate-500">{tr("تقرير اليوم", "Today's report")}</p>
+            <p className="text-xs font-bold text-slate-500">{tr("تقرير اليوم", "Daily report")}</p>
             <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1" />
           </div>
-          <div className="space-y-2">
-            <div>
-              <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1"><UtensilsCrossed className="w-3 h-3" /> {tr("الأكل والشرب", "Food & drink")}</label>
-              <textarea value={meals} onChange={(e) => setMeals(e.target.value)} rows={2} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" placeholder={tr("مثال: أكل الغدا كله، شرب 3 أكواب مية", "e.g. Ate all lunch, drank 3 cups of water")} />
+
+          <button onClick={() => setAbsent((v) => !v)}
+            className={`w-full text-xs font-bold py-2 rounded-xl border mb-3 ${absent ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-500 border-slate-200"}`}>
+            {absent ? tr("☑ غايب النهاردة — مفيش تقرير", "☑ Absent today — no report") : tr("☐ غايب النهاردة؟", "☐ Absent today?")}
+          </button>
+
+          {!absent && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1.5"><UtensilsCrossed className="w-3 h-3" /> {tr("الأكل والشرب", "Food & drink")}</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {MEAL_OPTIONS[lang].map((opt) => (
+                    <Chip key={opt} label={opt} active={mealsSel.includes(opt)} onClick={() => toggleFrom(mealsSel, setMealsSel, opt)} />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1.5"><Moon className="w-3 h-3" /> {tr("النوم", "Sleep")}</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {SLEEP_OPTIONS[lang].map((opt) => (
+                    <Chip key={opt} label={opt} active={sleepSel === opt} onClick={() => setSleepSel(sleepSel === opt ? "" : opt)} />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1.5"><Smile className="w-3 h-3" /> {tr("النشاط والمزاج", "Activity & mood")}</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {ACTIVITY_OPTIONS[lang].map((opt) => (
+                    <Chip key={opt} label={opt} active={activitySel.includes(opt)} onClick={() => toggleFrom(activitySel, setActivitySel, opt)} />
+                  ))}
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1"><Moon className="w-3 h-3" /> {tr("النوم", "Sleep")}</label>
-              <textarea value={sleep} onChange={(e) => setSleep(e.target.value)} rows={1} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" placeholder={tr("مثال: نام ساعة ونص", "e.g. Napped for 1h30")} />
-            </div>
-            <div>
-              <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1"><Smile className="w-3 h-3" /> {tr("النشاط والمزاج", "Activity & mood")}</label>
-              <textarea value={activity} onChange={(e) => setActivity(e.target.value)} rows={1} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" placeholder={tr("مثال: رسم ولعب خارجي، مبسوط طول اليوم", "e.g. Drawing, outdoor play, happy all day")} />
-            </div>
-            <div>
-              <label className="text-[11px] text-slate-400 mb-1 block">{tr("ملاحظة إضافية", "Extra note")}</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={1} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" />
-            </div>
+          )}
+
+          <div className="mt-3">
+            <label className="text-[11px] text-slate-400 mb-1 block">{tr("ملاحظة إضافية (اختياري)", "Extra note (optional)")}</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={1} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" />
           </div>
-          <button onClick={saveReport} disabled={savingReport} className="w-full bg-sky-500 text-white font-bold py-2 rounded-xl text-xs mt-2 disabled:opacity-60">
-            {savingReport ? tr("جارِ الحفظ...", "Saving...") : tr("حفظ تقرير اليوم", "Save today's report")}
+
+          <button onClick={saveReport} disabled={savingReport} className="w-full bg-sky-500 text-white font-bold py-2 rounded-xl text-xs mt-3 disabled:opacity-60">
+            {savingReport ? tr("جارِ الحفظ...", "Saving...") : tr("حفظ التقرير", "Save report")}
           </button>
           {reports.length > 0 && (
             <div className="mt-3 pt-2 border-t border-slate-200 space-y-1">
               <p className="text-[11px] font-bold text-slate-400">{tr("آخر التقارير", "Recent reports")}</p>
               {reports.slice(0, 5).map((r) => (
                 <div key={r.id} className="text-[11px] text-slate-500 flex items-center gap-2">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {r.report_date}
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {r.report_date}{r.absent ? ` — ${tr("غياب", "Absent")}` : ""}
                 </div>
               ))}
             </div>
