@@ -16,7 +16,7 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DOC_KEYS = ["father_id", "mother_id", "child_id", "child_photo", "vaccination_card", "signature"];
+const DOC_KEYS = ["father_id", "mother_id", "child_id", "child_photo", "vaccination_card", "signature", "full_form_pdf"];
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {

@@ -97,7 +97,8 @@ Deno.serve(async (req) => {
     const fee = billing ? `${billing.recurring_fee} د.إ (${freqAr}) + ${billing.one_time_fee} د.إ رسوم لمرة واحدة` : "-";
 
     const docs = record.documents || {};
-    const [signatureAttachment, fatherIdAttachment, motherIdAttachment, childIdAttachment, childPhotoAttachment, vaxCardAttachment] = await Promise.all([
+    const [fullFormAttachment, signatureAttachment, fatherIdAttachment, motherIdAttachment, childIdAttachment, childPhotoAttachment, vaxCardAttachment] = await Promise.all([
+      fetchAttachment(admin, docs.full_form_pdf, "استمارة-التسجيل-كاملة.pdf"),
       fetchAttachment(admin, docs.signature, "توقيع-ولي-الأمر.png"),
       fetchAttachment(admin, docs.father_id, "هوية-الأب.jpg"),
       fetchAttachment(admin, docs.mother_id, "هوية-الأم.jpg"),
@@ -105,7 +106,7 @@ Deno.serve(async (req) => {
       fetchAttachment(admin, docs.child_photo, "صورة-الطفل.jpg"),
       fetchAttachment(admin, docs.vaccination_card, "كارت-التطعيمات.jpg"),
     ]);
-    const attachments = [signatureAttachment, fatherIdAttachment, motherIdAttachment, childIdAttachment, childPhotoAttachment, vaxCardAttachment].filter(Boolean);
+    const attachments = [fullFormAttachment, signatureAttachment, fatherIdAttachment, motherIdAttachment, childIdAttachment, childPhotoAttachment, vaxCardAttachment].filter(Boolean);
 
     const signatureImg = signatureAttachment
       ? `<div style="margin-top:14px;"><p><b>توقيع ولي الأمر:</b></p><img src="data:image/png;base64,${signatureAttachment.content}" alt="التوقيع" style="max-width:280px;border:1px solid #e2e8f0;border-radius:8px;padding:6px;background:#fff;" /></div>`
@@ -121,7 +122,7 @@ Deno.serve(async (req) => {
         ${renderFormSummary(record.form_data || {})}
         ${signatureImg}
         <hr style="border:none;border-top:1px solid #e2e8f0;" />
-        <p>المستندات المرفوعة مرفقة بهذا الإيميل.</p>
+        <p>استمارة التسجيل كاملة (PDF) موقّعة، بالإضافة للمستندات المرفوعة، مرفقين بهذا الإيميل.</p>
       </div>
     `;
 

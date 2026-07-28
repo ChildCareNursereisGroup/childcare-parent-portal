@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import { BranchLogin, BranchAdminScreen } from "./BranchAdmin";
+import { generateFormPdfBlob } from "./lib/pdfExport";
 
 // ---------------- i18n ----------------
 const LangCtx = createContext({ lang: "ar", tr: (a) => a });
@@ -870,6 +871,21 @@ function RegisterForm({ onBack, showToast, standalone }) {
       if (!sigErr) signaturePath = path;
     }
 
+    let fullFormPath = null;
+    try {
+      const pdfBlob = await generateFormPdfBlob({
+        f,
+        branchLabel: selectedBranch ? selectedBranch.name.ar : f.branch,
+        billing: { recurring_fee: recurringFee, one_time_fee: oneTimeFee },
+        signatureDataUrl: f.signatureDataUrl || null,
+      });
+      const pdfPath = `${regId}/full-form-${Date.now()}.pdf`;
+      const { error: pdfErr } = await supabase.storage.from("registration-documents").upload(pdfPath, pdfBlob, { contentType: "application/pdf" });
+      if (!pdfErr) fullFormPath = pdfPath;
+    } catch (_e) {
+      fullFormPath = null;
+    }
+
     const { error } = await supabase.from("portal_registrations").insert({
       branch: selectedBranch?.key || f.branch || null,
       contact_email: contactEmail,
@@ -882,6 +898,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
         child_photo: files.childPhoto?.path || null,
         vaccination_card: files.vaxCard?.path || null,
         vaccination_pledge: !!f.vaxPledge,
+        full_form_pdf: fullFormPath,
         signature: signaturePath,
         billing: {
           frequency: freq,

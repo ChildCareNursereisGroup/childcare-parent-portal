@@ -14,6 +14,7 @@ const BRANCH_LABELS = {
 };
 
 const DOC_LABELS = {
+  full_form_pdf: { ar: "الاستمارة كاملة (PDF)", en: "Full form (PDF)" },
   father_id: { ar: "هوية الأب", en: "Father's ID" },
   mother_id: { ar: "هوية الأم", en: "Mother's ID" },
   child_id: { ar: "هوية/شهادة ميلاد الطفل", en: "Child's ID/birth cert." },
