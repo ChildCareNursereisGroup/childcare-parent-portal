@@ -76,7 +76,9 @@ const PLAN_TIMES = [
   { key: "8", label: { ar: "٨:٠٠ ص", en: "8:00 AM" } },
   { key: "11", label: { ar: "١١:٠٠ ص", en: "11:00 AM" } },
   { key: "13", label: { ar: "١:٠٠ م", en: "1:00 PM" } },
+  { key: "14", label: { ar: "٢:٠٠ م", en: "2:00 PM" } },
   { key: "15", label: { ar: "٣:٠٠ م", en: "3:00 PM" } },
+  { key: "16", label: { ar: "٤:٠٠ م", en: "4:00 PM" } },
   { key: "17", label: { ar: "٥:٠٠ م", en: "5:00 PM" } },
 ];
 const PLANS = [
@@ -84,6 +86,10 @@ const PLANS = [
   { key: "slot_11_15", from: "11", to: "15", label: { ar: "الاثنين - الخميس · ١١:٠٠ ص - ٣:٠٠ م", en: "Mon-Thu · 11:00-3:00" }, monthly: 1000, weekly: 350, daily: 80 },
   { key: "slot_8_13", from: "8", to: "13", label: { ar: "الاثنين - الخميس · ٨:٠٠ ص - ١:٠٠ م (+ساعة إضافية ١٠٠ د.إ)", en: "Mon-Thu · 8:00-1:00 (+AED100/extra hour)" }, monthly: 1100, weekly: 360, daily: 100 },
   { key: "slot_13_17", from: "13", to: "17", label: { ar: "الاثنين - الخميس · ١:٠٠ م - ٥:٠٠ م", en: "Mon-Thu · 1:00-5:00" }, monthly: 800, weekly: 250, daily: 80 },
+  { key: "slot_8_14", from: "8", to: "14", label: { ar: "الاثنين - الخميس · ٨:٠٠ ص - ٢:٠٠ م", en: "Mon-Thu · 8:00-2:00" }, monthly: 1200, weekly: 400, daily: 100 },
+  { key: "slot_8_15", from: "8", to: "15", label: { ar: "الاثنين - الخميس · ٨:٠٠ ص - ٣:٠٠ م", en: "Mon-Thu · 8:00-3:00" }, monthly: 1300, weekly: 420, daily: 110 },
+  { key: "slot_8_16", from: "8", to: "16", label: { ar: "الاثنين - الخميس · ٨:٠٠ ص - ٤:٠٠ م", en: "Mon-Thu · 8:00-4:00" }, monthly: 1400, weekly: 450, daily: 120 },
+  { key: "slot_8_17", from: "8", to: "17", label: { ar: "الاثنين - الخميس · ٨:٠٠ ص - ٥:٠٠ م", en: "Mon-Thu · 8:00-5:00" }, monthly: 1500, weekly: 500, daily: 150 },
 ];
 const TRANSPORT_OPTIONS = [
   { key: "none", label: { ar: "بدون مواصلات", en: "No transportation" }, monthly: 0, weekly: 0, daily: 0 },
