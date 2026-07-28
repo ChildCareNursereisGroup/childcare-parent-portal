@@ -1,0 +1,392 @@
+import { useState, useEffect } from "react";
+import {
+  ChevronLeft, LogOut, Search, CheckCircle2, X, UtensilsCrossed, Moon,
+  Smile, FileText, Users,
+} from "lucide-react";
+import { supabase } from "./lib/supabaseClient";
+
+const BRANCH_LABELS = {
+  farha: { ar: "الفرحة – القاسمية", en: "Al Farha" },
+  saada: { ar: "السعادة – الشارقان", en: "Al Saada" },
+  dolphin: { ar: "دولفين – سمنان", en: "Dolphin" },
+  saadakids: { ar: "السعادة للأطفال", en: "Al Saada for Kids" },
+  abtal: { ar: "أبطال البراعم", en: "Abtal Al Baraiem" },
+};
+
+const DOC_LABELS = {
+  father_id: { ar: "هوية الأب", en: "Father's ID" },
+  mother_id: { ar: "هوية الأم", en: "Mother's ID" },
+  child_id: { ar: "هوية/شهادة ميلاد الطفل", en: "Child's ID/birth cert." },
+  child_photo: { ar: "صورة الطفل", en: "Child's photo" },
+  vaccination_card: { ar: "كرت التطعيمات", en: "Vaccination card" },
+  signature: { ar: "التوقيع", en: "Signature" },
+};
+
+const KEY_LABELS = {
+  name: { ar: "اسم الطفل", en: "Child's name" },
+  nick: { ar: "اسم الدلع", en: "Nickname" },
+  dob: { ar: "تاريخ الميلاد", en: "Date of birth" },
+  gender: { ar: "النوع", en: "Gender" },
+  nat: { ar: "الجنسية", en: "Nationality" },
+  blood: { ar: "فصيلة الدم", en: "Blood type" },
+  fName: { ar: "اسم الأب", en: "Father's name" },
+  fMobile: { ar: "موبايل الأب", en: "Father's mobile" },
+  fEmail: { ar: "إيميل الأب", en: "Father's email" },
+  mName: { ar: "اسم الأم", en: "Mother's name" },
+  mMobile: { ar: "موبايل الأم", en: "Mother's mobile" },
+  mEmail: { ar: "إيميل الأم", en: "Mother's email" },
+  emName: { ar: "اسم جهة الطوارئ", en: "Emergency contact" },
+  emRel: { ar: "صلة القرابة", en: "Relation" },
+  emMobile: { ar: "موبايل الطوارئ", en: "Emergency mobile" },
+  allergy: { ar: "حساسية؟", en: "Allergies?" },
+  allergyDetail: { ar: "تفاصيل الحساسية", en: "Allergy details" },
+  illness: { ar: "أمراض مزمنة؟", en: "Chronic illness?" },
+  illnessDetail: { ar: "تفاصيل المرض", en: "Illness details" },
+  meds: { ar: "أدوية؟", en: "Medication?" },
+  medsDetail: { ar: "تفاصيل الأدوية", en: "Medication details" },
+  doctor: { ar: "دكتور الطفل", en: "Child's doctor" },
+  address: { ar: "العنوان", en: "Address" },
+};
+
+const SKIP_KEYS = new Set(["signatureDataUrl", "branch"]);
+
+function humanizeKey(key) {
+  return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+}
+
+export function BranchLogin({ tr, onBack, onLoggedIn }) {
+  const [branch, setBranch] = useState(null);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    setError("");
+    if (!branch) { setError(tr("اختاري الفرع", "Pick a branch")); return; }
+    if (!password) { setError(tr("اكتبي الباسورد", "Enter the password")); return; }
+    setLoading(true);
+    const { data, error: fnError } = await supabase.functions.invoke("branch-admin", {
+      body: { action: "login", branch, password },
+    });
+    setLoading(false);
+    if (fnError || data?.error) {
+      setError(data?.error || tr("حصل خطأ، جرّبي تاني", "Something went wrong"));
+      return;
+    }
+    onLoggedIn({ token: data.token, branch: data.branch });
+  };
+
+  return (
+    <div className="h-full flex flex-col items-center justify-center px-6 bg-gradient-to-b from-slate-700 to-slate-900 text-white relative">
+      {onBack && (
+        <button onClick={onBack} className="absolute top-4 right-4 bg-white/20 rounded-full w-8 h-8 flex items-center justify-center">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+      )}
+      <h1 className="text-lg font-extrabold mb-1 text-center">{tr("دخول إدارة الفرع", "Branch admin login")}</h1>
+      <p className="text-slate-300 text-xs mb-6">{tr("لموظفي الفروع فقط", "Branch staff only")}</p>
+      <div className="w-full bg-white rounded-2xl p-5 shadow-xl text-slate-700">
+        <p className="text-xs font-bold text-slate-500 mb-2">{tr("اختاري الفرع", "Pick your branch")}</p>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {Object.entries(BRANCH_LABELS).map(([key, label]) => (
+            <button key={key} onClick={() => setBranch(key)}
+              className={`text-xs font-bold py-2.5 rounded-xl border-2 transition ${branch === key ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-600 border-slate-200"}`}>
+              {tr(label.ar, label.en)}
+            </button>
+          ))}
+        </div>
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="🔒 ••••" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-3 text-center focus:outline-none focus:ring-2 focus:ring-slate-400" />
+        {error && <p className="text-xs text-rose-500 font-bold mb-3 text-center">{error}</p>}
+        <button onClick={submit} disabled={loading} className="w-full bg-slate-800 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-60">
+          {loading ? tr("جارِ الدخول...", "Logging in...") : tr("دخول", "Log in")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StatusChip({ status, tr }) {
+  const map = {
+    pending: { ok: false, label: tr("قيد المراجعة", "Pending") },
+    approved: { ok: true, label: tr("مقبول", "Approved") },
+  };
+  const s = map[status] || { ok: false, label: status };
+  return (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.ok ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600"}`}>
+      {s.label}
+    </span>
+  );
+}
+
+function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast }) {
+  const f = reg.form_data || {};
+  const [approving, setApproving] = useState(false);
+  const [classSel, setClassSel] = useState(reg.class_id || "");
+  const [newClassName, setNewClassName] = useState("");
+  const [savingClass, setSavingClass] = useState(false);
+  const [reportDate, setReportDate] = useState(new Date().toISOString().slice(0, 10));
+  const [meals, setMeals] = useState("");
+  const [sleep, setSleep] = useState("");
+  const [activity, setActivity] = useState("");
+  const [notes, setNotes] = useState("");
+  const [savingReport, setSavingReport] = useState(false);
+  const [reports, setReports] = useState([]);
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    supabase.functions.invoke("branch-admin", { body: { action: "list_reports", token, registration_id: reg.id } })
+      .then(({ data }) => setReports(data?.reports || []));
+  }, [reg.id]);
+
+  const approve = async () => {
+    setApproving(true);
+    const { data, error } = await supabase.functions.invoke("branch-admin", { body: { action: "approve", token, registration_id: reg.id } });
+    setApproving(false);
+    if (error || data?.error) { showToast(tr("حصل خطأ أثناء الموافقة", "Approval failed")); return; }
+    showToast(tr("تمت الموافقة", "Approved"));
+    onChanged();
+  };
+
+  const saveClass = async () => {
+    setSavingClass(true);
+    const { data, error } = await supabase.functions.invoke("branch-admin", {
+      body: { action: "assign_class", token, registration_id: reg.id, class_id: newClassName ? null : (classSel || null), new_class_name: newClassName || null },
+    });
+    setSavingClass(false);
+    if (error || data?.error) { showToast(tr("حصل خطأ", "Something went wrong")); return; }
+    setNewClassName("");
+    showToast(tr("تم تحديث الفصل", "Class updated"));
+    onChanged();
+  };
+
+  const saveReport = async () => {
+    setSavingReport(true);
+    const { data, error } = await supabase.functions.invoke("branch-admin", {
+      body: { action: "save_report", token, registration_id: reg.id, report_date: reportDate, meals, sleep, activity, notes },
+    });
+    setSavingReport(false);
+    if (error || data?.error) { showToast(tr("حصل خطأ في حفظ التقرير", "Failed to save report")); return; }
+    showToast(tr("تم حفظ تقرير اليوم", "Today's report saved"));
+    supabase.functions.invoke("branch-admin", { body: { action: "list_reports", token, registration_id: reg.id } })
+      .then(({ data }) => setReports(data?.reports || []));
+  };
+
+  const knownEntries = Object.keys(KEY_LABELS).filter((k) => f[k] !== undefined && f[k] !== null && f[k] !== "");
+  const otherEntries = Object.keys(f).filter((k) => !SKIP_KEYS.has(k) && !KEY_LABELS[k] && f[k] !== undefined && f[k] !== null && f[k] !== "" && typeof f[k] !== "object");
+
+  return (
+    <div className="absolute inset-0 bg-white z-20 flex flex-col">
+      <div className="flex items-center justify-between px-4 pt-5 pb-3 border-b border-slate-100">
+        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100">
+          <X className="w-4 h-4 text-slate-400" />
+        </button>
+        <p className="font-extrabold text-slate-800 text-sm">{f.name || tr("بدون اسم", "No name")}</p>
+        <span className="w-8" />
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <StatusChip status={reg.status} tr={tr} />
+          <span className="text-xs text-slate-400" dir="ltr">{reg.contact_email}</span>
+        </div>
+
+        {reg.status === "pending" && (
+          <button onClick={approve} disabled={approving} className="w-full bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-60">
+            {approving ? tr("جارِ الموافقة...", "Approving...") : tr("✓ موافقة على التسجيل", "✓ Approve registration")}
+          </button>
+        )}
+
+        <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
+          <p className="text-xs font-bold text-slate-500 mb-2">{tr("بيانات الطفل", "Child details")}</p>
+          <div className="space-y-1.5">
+            {knownEntries.map((k) => (
+              <div key={k} className="flex justify-between gap-2 text-xs">
+                <span className="text-slate-400">{tr(KEY_LABELS[k].ar, KEY_LABELS[k].en)}</span>
+                <span className="text-slate-700 font-bold text-left" dir="auto">{String(f[k])}</span>
+              </div>
+            ))}
+          </div>
+          {otherEntries.length > 0 && (
+            <>
+              <button onClick={() => setShowAll((v) => !v)} className="text-[11px] text-sky-500 font-bold mt-2">
+                {showAll ? tr("إخفاء باقي البيانات", "Hide extra data") : tr("عرض كل البيانات", "Show all data")}
+              </button>
+              {showAll && (
+                <div className="space-y-1.5 mt-2 pt-2 border-t border-slate-200">
+                  {otherEntries.map((k) => (
+                    <div key={k} className="flex justify-between gap-2 text-xs">
+                      <span className="text-slate-400">{humanizeKey(k)}</span>
+                      <span className="text-slate-700 font-bold text-left" dir="auto">{String(f[k])}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
+          <p className="text-xs font-bold text-slate-500 mb-2">{tr("المستندات", "Documents")}</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(DOC_LABELS).map(([k, label]) => {
+              const url = reg.document_urls?.[k];
+              return (
+                <a key={k} href={url || undefined} target="_blank" rel="noreferrer"
+                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-full flex items-center gap-1 ${url ? "bg-sky-100 text-sky-600" : "bg-slate-100 text-slate-300"}`}
+                  onClick={(e) => !url && e.preventDefault()}>
+                  <FileText className="w-3 h-3" /> {tr(label.ar, label.en)}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
+          <p className="text-xs font-bold text-slate-500 mb-2">{tr("الفصل", "Class")}</p>
+          <div className="flex gap-2 mb-2">
+            <select value={classSel} onChange={(e) => { setClassSel(e.target.value); setNewClassName(""); }}
+              className="flex-1 border border-slate-200 rounded-xl px-2 py-2 text-xs">
+              <option value="">{tr("— بدون فصل —", "— No class —")}</option>
+              {classes.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+            </select>
+          </div>
+          <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)}
+            placeholder={tr("أو اكتبي اسم فصل جديد", "Or type a new class name")}
+            className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mb-2" />
+          <button onClick={saveClass} disabled={savingClass} className="w-full bg-slate-800 text-white font-bold py-2 rounded-xl text-xs disabled:opacity-60">
+            {savingClass ? tr("جارِ الحفظ...", "Saving...") : tr("حفظ الفصل", "Save class")}
+          </button>
+        </div>
+
+        <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold text-slate-500">{tr("تقرير اليوم", "Today's report")}</p>
+            <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1" />
+          </div>
+          <div className="space-y-2">
+            <div>
+              <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1"><UtensilsCrossed className="w-3 h-3" /> {tr("الأكل والشرب", "Food & drink")}</label>
+              <textarea value={meals} onChange={(e) => setMeals(e.target.value)} rows={2} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" placeholder={tr("مثال: أكل الغدا كله، شرب 3 أكواب مية", "e.g. Ate all lunch, drank 3 cups of water")} />
+            </div>
+            <div>
+              <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1"><Moon className="w-3 h-3" /> {tr("النوم", "Sleep")}</label>
+              <textarea value={sleep} onChange={(e) => setSleep(e.target.value)} rows={1} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" placeholder={tr("مثال: نام ساعة ونص", "e.g. Napped for 1h30")} />
+            </div>
+            <div>
+              <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1"><Smile className="w-3 h-3" /> {tr("النشاط والمزاج", "Activity & mood")}</label>
+              <textarea value={activity} onChange={(e) => setActivity(e.target.value)} rows={1} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" placeholder={tr("مثال: رسم ولعب خارجي، مبسوط طول اليوم", "e.g. Drawing, outdoor play, happy all day")} />
+            </div>
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1 block">{tr("ملاحظة إضافية", "Extra note")}</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={1} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" />
+            </div>
+          </div>
+          <button onClick={saveReport} disabled={savingReport} className="w-full bg-sky-500 text-white font-bold py-2 rounded-xl text-xs mt-2 disabled:opacity-60">
+            {savingReport ? tr("جارِ الحفظ...", "Saving...") : tr("حفظ تقرير اليوم", "Save today's report")}
+          </button>
+          {reports.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-slate-200 space-y-1">
+              <p className="text-[11px] font-bold text-slate-400">{tr("آخر التقارير", "Recent reports")}</p>
+              {reports.slice(0, 5).map((r) => (
+                <div key={r.id} className="text-[11px] text-slate-500 flex items-center gap-2">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {r.report_date}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
+  const [regs, setRegs] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke("branch-admin", { body: { action: "list", token: session.token } });
+    setLoading(false);
+    if (error || data?.error) {
+      showToast(tr("الجلسة منتهية، سجّلي دخول تاني", "Session expired, log in again"));
+      onLogout();
+      return;
+    }
+    setRegs(data.registrations || []);
+    setClasses(data.classes || []);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const classNameById = Object.fromEntries(classes.map((c) => [c.id, c.name]));
+  const q = search.trim().toLowerCase();
+  const filtered = regs
+    .filter((r) => {
+      if (!q) return true;
+      const name = (r.form_data?.name || "").toLowerCase();
+      const cls = (classNameById[r.class_id] || "").toLowerCase();
+      return name.includes(q) || cls.includes(q);
+    })
+    .sort((a, b) => (a.form_data?.name || "").localeCompare(b.form_data?.name || "", "ar"));
+
+  const selectedReg = selected ? regs.find((r) => r.id === selected) : null;
+
+  return (
+    <div className="h-full flex flex-col relative">
+      <div className="flex items-center justify-between px-4 pt-5 pb-3 bg-white border-b border-slate-100">
+        <button onClick={onLogout} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100">
+          <LogOut className="w-4 h-4 text-slate-400" />
+        </button>
+        <p className="font-extrabold text-slate-800 text-sm flex items-center gap-1">
+          <Users className="w-4 h-4 text-slate-400" />
+          {tr(BRANCH_LABELS[session.branch]?.ar, BRANCH_LABELS[session.branch]?.en) || session.branch}
+        </p>
+        <span className="w-8" />
+      </div>
+
+      <div className="px-4 pt-3 pb-2 bg-white border-b border-slate-100">
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 text-slate-300 absolute top-1/2 -translate-y-1/2 right-3" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder={tr("دوري باسم الطفل أو اسم الفصل...", "Search by child or class name...")}
+            className="w-full border border-slate-200 rounded-xl pr-9 pl-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-400" />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+        {loading && <p className="text-xs text-slate-400 text-center">{tr("جارِ التحميل...", "Loading...")}</p>}
+        {!loading && filtered.length === 0 && <p className="text-xs text-slate-400 text-center">{tr("لا يوجد أطفال مطابقين", "No matching children")}</p>}
+        {filtered.map((r) => (
+          <button key={r.id} onClick={() => setSelected(r.id)} className="w-full bg-white rounded-2xl p-3 shadow-sm border border-slate-100 text-right flex items-center justify-between">
+            <ChevronLeft className="w-4 h-4 text-slate-300" />
+            <div className="flex-1 text-right">
+              <div className="flex items-center gap-2 justify-end mb-1">
+                <StatusChip status={r.status} tr={tr} />
+                {r.class_id && <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">{classNameById[r.class_id]}</span>}
+              </div>
+              <p className="text-sm font-bold text-slate-800">{r.form_data?.name || tr("بدون اسم", "No name")}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {selectedReg && (
+        <ChildDetail
+          tr={tr}
+          reg={selectedReg}
+          classes={classes}
+          token={session.token}
+          onClose={() => setSelected(null)}
+          onChanged={() => { load(); }}
+          showToast={showToast}
+        />
+      )}
+    </div>
+  );
+}

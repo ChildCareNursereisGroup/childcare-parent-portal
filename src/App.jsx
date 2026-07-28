@@ -7,6 +7,7 @@ import {
   Building2
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
+import { BranchLogin, BranchAdminScreen } from "./BranchAdmin";
 
 // ---------------- i18n ----------------
 const LangCtx = createContext({ lang: "ar", tr: (a) => a });
@@ -325,7 +326,7 @@ function Logo({ size = 64 }) {
     </svg>
   );
 }
-function Landing({ onNew, onExisting }) {
+function Landing({ onNew, onExisting, onBranchAdmin }) {
   const { lang, setLang, tr } = useLang();
   return (
     <div className="h-full overflow-y-auto bg-gradient-to-b from-sky-500 via-cyan-400 to-emerald-300 text-white relative">
@@ -369,6 +370,9 @@ function Landing({ onNew, onExisting }) {
         <p className="text-[10px] text-slate-400 text-center mt-4 leading-relaxed">
           {tr("ⓘ لو دي أول مرة، اضغطي \"تسجيل طفل جديد\" ومحتاجيش حساب. بعد موافقة الإدارة، هيتبعتلك رابط دخول لمتابعة كل حاجة عن طفلك.", "ⓘ First time here? Tap \"Register a new child\" — no account needed. Once approved, you'll get a login link to follow everything about your child.")}
         </p>
+        <button onClick={onBranchAdmin} className="w-full text-center text-[10px] text-slate-300 font-bold mt-4">
+          {tr("دخول إدارة الفرع", "Branch admin login")}
+        </button>
       </div>
     </div>
   );
@@ -610,63 +614,76 @@ function ScheduleScreen({ showToast }) {
 }
 
 // ---------------- Reports ----------------
-function ReportsScreen() {
+function ReportsScreen({ registrationId }) {
   const { tr } = useLang();
-  const [day, setDay] = useState("today");
-  const [noteIdx, setNoteIdx] = useState(0);
-  const meals = [
-    { m: tr("الفطار", "Breakfast"), ok: true },
-    { m: tr("الغداء", "Lunch"), ok: true },
-    { m: tr("سناك بعد الظهر", "Afternoon snack"), ok: false },
-  ];
-  const activities = [tr("رسم", "Drawing"), tr("موسيقى", "Music"), tr("لعب خارجي", "Outdoor play")];
-  const note = split(QUICK_NOTES[noteIdx]);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (!registrationId) { setLoading(false); return; }
+    setLoading(true);
+    supabase
+      .from("daily_reports")
+      .select("*")
+      .eq("registration_id", registrationId)
+      .order("report_date", { ascending: false })
+      .limit(14)
+      .then(({ data }) => { setReports(data || []); setIdx(0); setLoading(false); });
+  }, [registrationId]);
+
+  if (loading) return <p className="text-xs text-slate-400 text-center pt-10">{tr("جارِ التحميل...", "Loading...")}</p>;
+
+  if (reports.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center px-8 text-center">
+        <p className="text-xs text-slate-400 leading-relaxed">{tr("لسه معملش تقرير يومي لطفلك. هيظهر هنا أول ما المربية تسجّل تقرير اليوم.", "No daily report yet. It'll show up here once the teacher logs today's report.")}</p>
+      </div>
+    );
+  }
+
+  const r = reports[idx];
+
   return (
     <div className="px-4 py-4 space-y-3 overflow-y-auto h-full pb-4">
-      <div className="flex gap-2 justify-center">
-        <button onClick={() => setDay("today")} className={`text-xs font-bold px-3 py-1.5 rounded-full ${day === "today" ? "bg-slate-800 text-white" : "bg-white text-slate-400 border border-slate-200"}`}>{tr("اليوم", "Today")}</button>
-        <button onClick={() => setDay("yesterday")} className={`text-xs font-bold px-3 py-1.5 rounded-full ${day === "yesterday" ? "bg-slate-800 text-white" : "bg-white text-slate-400 border border-slate-200"}`}>{tr("أمس", "Yesterday")}</button>
+      <div className="flex gap-2 justify-center flex-wrap">
+        {reports.map((rep, i) => (
+          <button key={rep.id} onClick={() => setIdx(i)} className={`text-xs font-bold px-3 py-1.5 rounded-full ${i === idx ? "bg-slate-800 text-white" : "bg-white text-slate-400 border border-slate-200"}`}>
+            {rep.report_date}
+          </button>
+        ))}
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <p className="font-bold text-slate-800 text-sm mb-3">{tr("الوجبات", "Meals")}</p>
-        <div className="space-y-2">
-          {meals.map((r) => (
-            <div key={r.m} className="flex items-center justify-between">
-              <StatusChip ok={r.ok} label={r.ok ? tr("أكل الكل", "Ate all") : tr("أكل جزء", "Ate some")} />
-              <span className="text-sm text-slate-600 font-bold">{r.m}</span>
-            </div>
-          ))}
+        <div className="flex items-center gap-2 mb-2">
+          <UtensilsCrossed className="w-4 h-4 text-emerald-500" />
+          <p className="font-bold text-slate-800 text-sm">{tr("الأكل والشرب", "Food & drink")}</p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 text-center">
-          <Droplet className="w-5 h-5 mx-auto text-sky-500 mb-1" />
-          <p className="text-lg font-extrabold text-slate-800">3</p>
-          <p className="text-[11px] text-slate-400">{tr("أكواب ماء", "Cups of water")}</p>
-        </div>
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 text-center">
-          <Moon className="w-5 h-5 mx-auto text-indigo-500 mb-1" />
-          <p className="text-lg font-extrabold text-slate-800">{tr("1:30 س", "1h 30m")}</p>
-          <p className="text-[11px] text-slate-400">{tr("مدة القيلولة", "Nap duration")}</p>
-        </div>
+        <p className="text-xs text-slate-600 leading-relaxed">{r.meals || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <div className="flex items-center justify-between mb-2">
-          <Smile className="w-5 h-5 text-amber-500" />
-          <p className="font-bold text-slate-800 text-sm">{tr("الحالة المزاجية والأنشطة", "Mood & activities")}</p>
+        <div className="flex items-center gap-2 mb-2">
+          <Moon className="w-4 h-4 text-indigo-500" />
+          <p className="font-bold text-slate-800 text-sm">{tr("النوم", "Sleep")}</p>
         </div>
-        <div className="flex flex-wrap gap-2 justify-end">
-          {activities.map((a) => (<span key={a} className="text-[11px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{a}</span>))}
-        </div>
+        <p className="text-xs text-slate-600 leading-relaxed">{r.sleep || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
       </div>
 
-      <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100 space-y-2">
-        <p className="text-xs font-bold text-sky-600">{tr("ملاحظة المربية", "Teacher's note")}</p>
-        <p className="text-xs text-slate-600 leading-relaxed bg-white rounded-lg p-2">{tr(note.ar, note.en)}</p>
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+        <div className="flex items-center gap-2 mb-2">
+          <Smile className="w-4 h-4 text-amber-500" />
+          <p className="font-bold text-slate-800 text-sm">{tr("النشاط والمزاج", "Activity & mood")}</p>
+        </div>
+        <p className="text-xs text-slate-600 leading-relaxed">{r.activity || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
       </div>
+
+      {r.notes && (
+        <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100 space-y-2">
+          <p className="text-xs font-bold text-sky-600">{tr("ملاحظة المربية", "Teacher's note")}</p>
+          <p className="text-xs text-slate-600 leading-relaxed bg-white rounded-lg p-2">{r.notes}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1356,6 +1373,67 @@ function MoreMenu({ setMoreView }) {
 // ---------------- Admin ----------------
 const ADMIN_EMAIL = "smbkfamily@gmail.com";
 
+function BranchPasswordsPanel({ tr, showToast }) {
+  const [open, setOpen] = useState(false);
+  const [passwords, setPasswords] = useState(null);
+  const [edits, setEdits] = useState({});
+  const [savingBranch, setSavingBranch] = useState(null);
+
+  const load = async () => {
+    const { data, error } = await supabase.functions.invoke("branch-admin", { body: { action: "admin_get_passwords" } });
+    if (!error && !data?.error) setPasswords(data.passwords || []);
+  };
+
+  const toggle = () => {
+    setOpen((v) => !v);
+    if (!passwords) load();
+  };
+
+  const save = async (branch) => {
+    const password = (edits[branch] || "").trim();
+    if (password.length < 4) { showToast(tr("الباسورد لازم يكون 4 حروف على الأقل", "Password must be at least 4 characters")); return; }
+    setSavingBranch(branch);
+    const { data, error } = await supabase.functions.invoke("branch-admin", { body: { action: "admin_set_password", branch, password } });
+    setSavingBranch(null);
+    if (error || data?.error) { showToast(tr("حصل خطأ", "Something went wrong")); return; }
+    showToast(tr("تم تحديث باسورد الفرع", "Branch password updated"));
+    setEdits((e) => ({ ...e, [branch]: "" }));
+    load();
+  };
+
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+      <button onClick={toggle} className="w-full flex items-center justify-between">
+        <ChevronLeft className={`w-4 h-4 text-slate-300 transition ${open ? "-rotate-90" : ""}`} />
+        <p className="text-sm font-bold text-slate-700">🔐 {tr("كلمات مرور الفروع", "Branch passwords")}</p>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          {!passwords && <p className="text-xs text-slate-400 text-center">{tr("جارِ التحميل...", "Loading...")}</p>}
+          {passwords?.map((p) => {
+            const branch = BRANCHES.find((b) => b.key === p.branch);
+            return (
+              <div key={p.branch} className="border-t border-slate-100 pt-3">
+                <p className="text-xs font-bold text-slate-600 mb-1">{branch ? tr(branch.name.ar, branch.name.en) : p.branch}</p>
+                <p className="text-[11px] text-slate-400 mb-1.5" dir="ltr">{tr("الحالي: ", "Current: ")}{p.password}</p>
+                <div className="flex gap-2">
+                  <input value={edits[p.branch] || ""} onChange={(e) => setEdits((s) => ({ ...s, [p.branch]: e.target.value }))}
+                    placeholder={tr("باسورد جديد", "New password")}
+                    className="flex-1 border border-slate-200 rounded-xl px-2.5 py-2 text-xs" />
+                  <button onClick={() => save(p.branch)} disabled={savingBranch === p.branch}
+                    className="bg-slate-800 text-white font-bold px-3 rounded-xl text-xs disabled:opacity-60">
+                    {savingBranch === p.branch ? "..." : tr("حفظ", "Save")}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminScreen({ showToast, onLogout }) {
   const { tr } = useLang();
   const [regs, setRegs] = useState([]);
@@ -1436,6 +1514,7 @@ function AdminScreen({ showToast, onLogout }) {
             ))}
           </>
         )}
+        <BranchPasswordsPanel tr={tr} showToast={showToast} />
       </div>
     </div>
   );
@@ -1464,6 +1543,8 @@ export default function ParentPortalPrototype() {
   const [authChecked, setAuthChecked] = useState(false);
   const [userEmail, setUserEmail] = useState(null);
   const [approvalStatus, setApprovalStatus] = useState("checking"); // checking | approved | pending
+  const [myRegistrationId, setMyRegistrationId] = useState(null);
+  const [branchSession, setBranchSession] = useState(null);
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(""), 2400); };
 
   useEffect(() => {
@@ -1493,6 +1574,7 @@ export default function ParentPortalPrototype() {
         .limit(1)
         .then(({ data: rows, error }) => {
           setApprovalStatus(!error && rows && rows.length > 0 ? "approved" : "pending");
+          setMyRegistrationId(!error && rows && rows.length > 0 ? rows[0].id : null);
         });
     });
   }, [userEmail]);
@@ -1525,11 +1607,19 @@ export default function ParentPortalPrototype() {
       <div dir={lang === "ar" ? "rtl" : "ltr"} className="w-full flex justify-center bg-slate-100 font-sans" style={{ minHeight: 700 }}>
         <div className="relative w-full max-w-sm bg-slate-50 rounded-[2rem] shadow-2xl overflow-hidden border-4 border-slate-800" style={{ height: 720 }}>
 
-          {screen === "landing" && <Landing onNew={() => setScreen("newRegister")} onExisting={() => setScreen("login")} />}
+          {screen === "landing" && <Landing onNew={() => setScreen("newRegister")} onExisting={() => setScreen("login")} onBranchAdmin={() => setScreen("branchLogin")} />}
 
           {screen === "newRegister" && <RegisterForm standalone onBack={() => setScreen("landing")} showToast={showToast} />}
 
           {screen === "login" && <Login onBack={() => setScreen("landing")} />}
+
+          {screen === "branchLogin" && (
+            <BranchLogin tr={tr} onBack={() => setScreen("landing")} onLoggedIn={(session) => { setBranchSession(session); setScreen("branchAdmin"); }} />
+          )}
+
+          {screen === "branchAdmin" && branchSession && (
+            <BranchAdminScreen tr={tr} session={branchSession} showToast={showToast} onLogout={() => { setBranchSession(null); setScreen("landing"); }} />
+          )}
 
           {screen === "app" && userEmail === ADMIN_EMAIL && <AdminScreen showToast={showToast} onLogout={logout} />}
 
@@ -1556,7 +1646,7 @@ export default function ParentPortalPrototype() {
               <div className="flex-1 overflow-hidden">
                 {activeTab === "home" && <HomeScreen setActiveTab={setActiveTab} setMoreView={setMoreView} goBranch={() => { setActiveTab("more"); setMoreView("branch"); }} />}
                 {activeTab === "schedule" && <ScheduleScreen showToast={showToast} />}
-                {activeTab === "reports" && <ReportsScreen />}
+                {activeTab === "reports" && <ReportsScreen registrationId={myRegistrationId} />}
                 {activeTab === "fees" && <FeesScreen showToast={showToast} />}
                 {activeTab === "more" && !moreView && <MoreMenu setMoreView={setMoreView} />}
                 {activeTab === "more" && moreView === "register" && <RegisterForm onBack={() => setMoreView(null)} showToast={showToast} />}
