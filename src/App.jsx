@@ -7,7 +7,7 @@ import {
   Building2
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
-import { BranchLogin, BranchAdminScreen } from "./BranchAdmin";
+import { BranchLogin, BranchAdminScreen, DOMAINS } from "./BranchAdmin";
 import { generateFormPdfBlob } from "./lib/pdfExport";
 
 // ---------------- i18n ----------------
@@ -630,6 +630,22 @@ function ScheduleScreen({ showToast }) {
 // ---------------- Reports ----------------
 function ReportsScreen({ registrationId }) {
   const { tr } = useLang();
+  const [view, setView] = useState("daily");
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex gap-2 justify-center pt-3 pb-1">
+        <button onClick={() => setView("daily")} className={`text-xs font-bold px-3 py-1.5 rounded-full ${view === "daily" ? "bg-slate-800 text-white" : "bg-white text-slate-400 border border-slate-200"}`}>{tr("يومي", "Daily")}</button>
+        <button onClick={() => setView("monthly")} className={`text-xs font-bold px-3 py-1.5 rounded-full ${view === "monthly" ? "bg-slate-800 text-white" : "bg-white text-slate-400 border border-slate-200"}`}>{tr("التقييم الشهري", "Monthly evaluation")}</button>
+      </div>
+      <div className="flex-1 overflow-hidden">
+        {view === "daily" ? <DailyReportsView registrationId={registrationId} /> : <MonthlyEvalView registrationId={registrationId} />}
+      </div>
+    </div>
+  );
+}
+
+function DailyReportsView({ registrationId }) {
+  const { tr } = useLang();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [idx, setIdx] = useState(0);
@@ -704,6 +720,78 @@ function ReportsScreen({ registrationId }) {
         <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100 space-y-2">
           <p className="text-xs font-bold text-sky-600">{tr("ملاحظة المربية", "Teacher's note")}</p>
           <p className="text-xs text-slate-600 leading-relaxed bg-white rounded-lg p-2">{r.notes}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MonthlyEvalView({ registrationId }) {
+  const { tr } = useLang();
+  const [evaluations, setEvaluations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (!registrationId) { setLoading(false); return; }
+    setLoading(true);
+    supabase
+      .from("monthly_evaluations")
+      .select("*")
+      .eq("registration_id", registrationId)
+      .order("month", { ascending: false })
+      .then(({ data }) => { setEvaluations(data || []); setIdx(0); setLoading(false); });
+  }, [registrationId]);
+
+  if (loading) return <p className="text-xs text-slate-400 text-center pt-10">{tr("جارِ التحميل...", "Loading...")}</p>;
+
+  if (evaluations.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center px-8 text-center">
+        <p className="text-xs text-slate-400 leading-relaxed">{tr("لسه معملش تقييم شهري لطفلك. هيظهر هنا أول ما المربية تسجّله.", "No monthly evaluation yet. It'll show up here once the teacher logs it.")}</p>
+      </div>
+    );
+  }
+
+  const e = evaluations[idx];
+  const ratings = e.ratings || {};
+  const observations = e.observations || {};
+  const nextSteps = e.next_steps || {};
+
+  return (
+    <div className="px-4 py-4 space-y-3 overflow-y-auto h-full pb-4">
+      <div className="flex gap-2 justify-center flex-wrap">
+        {evaluations.map((ev, i) => (
+          <button key={ev.id} onClick={() => setIdx(i)} className={`text-xs font-bold px-3 py-1.5 rounded-full ${i === idx ? "bg-slate-800 text-white" : "bg-white text-slate-400 border border-slate-200"}`}>
+            {ev.month}
+          </button>
+        ))}
+      </div>
+
+      {e.teacher_name && <p className="text-xs text-slate-400 text-center">{tr("بواسطة", "By")} {e.teacher_name}</p>}
+
+      {DOMAINS.map((d) => {
+        const rating = ratings[d.id] || 0;
+        if (!rating && !observations[d.id] && !nextSteps[d.id]) return null;
+        return (
+          <div key={d.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between mb-2">
+              <div dir="ltr">{"★".repeat(rating)}{"☆".repeat(5 - rating)}</div>
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-slate-800 text-sm">{tr(d.ar, d.en)}</p>
+                <span>{d.icon}</span>
+              </div>
+            </div>
+            {observations[d.id] && <p className="text-xs text-slate-600 leading-relaxed mb-1">{observations[d.id]}</p>}
+            {nextSteps[d.id] && <p className="text-[11px] text-sky-600 leading-relaxed">{tr("الخطوة القادمة: ", "Next step: ")}{nextSteps[d.id]}</p>}
+          </div>
+        );
+      })}
+
+      {e.general_note && (
+        <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100 space-y-2">
+          <p className="text-xs font-bold text-sky-600">{tr("ملاحظة عامة", "General note")}</p>
+          <p className="text-xs text-slate-600 leading-relaxed bg-white rounded-lg p-2">{e.general_note}</p>
         </div>
       )}
     </div>

@@ -55,6 +55,36 @@ const MEAL_OPTIONS = { ar: ["أكل الكل", "أكل جزء", "رفض الأك
 const SLEEP_OPTIONS = { ar: ["نام كويس", "نام شوية", "مانامش خالص"], en: ["Slept well", "Slept a little", "Didn't sleep at all"] };
 const ACTIVITY_OPTIONS = { ar: ["مبسوط", "هادي", "متضايق", "نشيط", "لعب مع الأصدقاء", "رسم", "أنشطة حركية", "موسيقى"], en: ["Happy", "Calm", "Upset", "Energetic", "Played with friends", "Drawing", "Physical activity", "Music"] };
 
+export const DOMAINS = [
+  { id: "lang", ar: "اللغة والتواصل", en: "Language & Communication", sub: { ar: "نطق • مفردات • قصص", en: "Speech • vocabulary • stories" }, icon: "🗣️", placeholder: { ar: "ذكر 5 كلمات جديدة، يجيب بجمل قصيرة...", en: "Said 5 new words, answers in short sentences..." } },
+  { id: "motor_g", ar: "المهارات الحركية الكبيرة", en: "Gross Motor Skills", sub: { ar: "توازن • مشي • قفز", en: "Balance • walking • jumping" }, icon: "🏃", placeholder: { ar: "يركض بدون سقوط، يصعد الدرج بثقة...", en: "Runs without falling, climbs stairs confidently..." } },
+  { id: "motor_f", ar: "المهارات الحركية الدقيقة", en: "Fine Motor Skills", sub: { ar: "إمساك • رسم • قص", en: "Grip • drawing • cutting" }, icon: "✋", placeholder: { ar: "يمسك القلم صح، يقص بالمقص بإرشاد...", en: "Holds pencil correctly, cuts with guidance..." } },
+  { id: "social", ar: "التطور الاجتماعي والعاطفي", en: "Social & Emotional", sub: { ar: "مشاركة • تعاون • مشاعر", en: "Sharing • cooperation • emotions" }, icon: "❤️", placeholder: { ar: "شارك الألعاب، عبّر عن مشاعره بكلمات...", en: "Shared toys, expressed feelings in words..." } },
+  { id: "cognitive", ar: "التطور المعرفي", en: "Cognitive Development", sub: { ar: "تفكير • حل مشكلات • تصنيف", en: "Thinking • problem-solving • sorting" }, icon: "🧠", placeholder: { ar: "رتّب الأشكال حسب اللون، حل لغز بسيط...", en: "Sorted shapes by color, solved a simple puzzle..." } },
+  { id: "selfcare", ar: "الاستقلالية والعناية الذاتية", en: "Independence & Self-care", sub: { ar: "نظافة • ترتيب • تناول طعام", en: "Hygiene • tidiness • eating" }, icon: "⭐", placeholder: { ar: "يغسل يديه وحده، يرتب أغراضه...", en: "Washes hands alone, tidies belongings..." } },
+];
+
+export const EVAL_FLAGS = {
+  ar: [
+    { id: "speech", label: "تأخر في الكلام", alert: "ممكن يحتاج تقييم نطق – راجعي مع مدير الفرع خلال أسبوع." },
+    { id: "social_delay", label: "صعوبة اجتماعية", alert: "طبّقي أنشطة تفاعلية جماعية وراقبي التطور لمدة أسبوعين." },
+    { id: "attention", label: "صعوبة تركيز", alert: "قصّري مدة الأنشطة لـ5-7 دقائق وضيفي فترات حركة." },
+    { id: "behavior", label: "سلوك متكرر", alert: "وثّقي التوقيت والمحفز – أبلغي مدير الفرع للتقييم." },
+    { id: "sensory", label: "حساسية حسية", alert: "جرّبي أدوات حسية آمنة وتحدثي مع الأهل عن بيئة البيت." },
+    { id: "parent_meeting", label: "اجتماع أهل مطلوب", alert: "حددي موعد مع الأهل هذا الشهر وأعدّي ملف الطفل." },
+    { id: "follow_up", label: "متابعة الشهر القادم", alert: "راجعي الملاحظة السابقة وقارني التقدم الشهر القادم." },
+  ],
+  en: [
+    { id: "speech", label: "Speech delay", alert: "May need a speech assessment — review with branch manager within a week." },
+    { id: "social_delay", label: "Social difficulty", alert: "Apply interactive group activities and monitor progress for two weeks." },
+    { id: "attention", label: "Attention difficulty", alert: "Shorten activities to 5-7 minutes and add movement breaks." },
+    { id: "behavior", label: "Repeated behavior", alert: "Document timing and trigger — inform branch manager for assessment." },
+    { id: "sensory", label: "Sensory sensitivity", alert: "Try safe sensory tools and discuss the home environment with parents." },
+    { id: "parent_meeting", label: "Parent meeting needed", alert: "Schedule a meeting with the parents this month and prepare the child's file." },
+    { id: "follow_up", label: "Follow up next month", alert: "Review the previous note and compare progress next month." },
+  ],
+};
+
 function humanizeKey(key) {
   return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }
@@ -132,6 +162,141 @@ function StatusChip({ status, tr }) {
     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.color}`}>
       {s.label}
     </span>
+  );
+}
+
+function StarRating({ value, onChange }) {
+  return (
+    <div className="flex gap-1" dir="ltr">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button key={n} type="button" onClick={() => onChange(n)} className="text-lg leading-none" style={{ color: n <= (value || 0) ? "#EF9F27" : "#e2e8f0" }}>
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function currentMonthKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function MonthlyEvalSection({ tr, lang, reg, token, showToast }) {
+  const [month, setMonth] = useState(currentMonthKey());
+  const [teacherName, setTeacherName] = useState("");
+  const [ratings, setRatings] = useState({});
+  const [observations, setObservations] = useState({});
+  const [nextSteps, setNextSteps] = useState({});
+  const [flags, setFlags] = useState([]);
+  const [generalNote, setGeneralNote] = useState("");
+  const [evaluations, setEvaluations] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    supabase.functions.invoke("branch-admin", { body: { action: "list_evaluations", token, registration_id: reg.id } })
+      .then(({ data }) => setEvaluations(data?.evaluations || []));
+  };
+
+  useEffect(() => { load(); }, [reg.id]);
+
+  useEffect(() => {
+    const existing = evaluations.find((e) => e.month === month);
+    if (existing) {
+      setTeacherName(existing.teacher_name || "");
+      setRatings(existing.ratings || {});
+      setObservations(existing.observations || {});
+      setNextSteps(existing.next_steps || {});
+      setFlags(existing.flags || []);
+      setGeneralNote(existing.general_note || "");
+    } else {
+      setTeacherName("");
+      setRatings({});
+      setObservations({});
+      setNextSteps({});
+      setFlags([]);
+      setGeneralNote("");
+    }
+  }, [month, evaluations]);
+
+  const toggleFlag = (id) => {
+    setFlags((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
+  };
+
+  const activeFlagAlerts = EVAL_FLAGS[lang].filter((f) => flags.includes(f.id));
+
+  const save = async () => {
+    setSaving(true);
+    const { data, error } = await supabase.functions.invoke("branch-admin", {
+      body: { action: "save_evaluation", token, registration_id: reg.id, month, teacher_name: teacherName, ratings, observations, next_steps: nextSteps, flags, general_note: generalNote },
+    });
+    setSaving(false);
+    if (error || data?.error) { showToast(tr("حصل خطأ في حفظ التقييم", "Failed to save evaluation")); return; }
+    showToast(tr("تم حفظ التقييم الشهري", "Monthly evaluation saved"));
+    load();
+  };
+
+  return (
+    <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-bold text-slate-500">{tr("التقييم الشهري", "Monthly evaluation")}</p>
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1" />
+      </div>
+
+      <input value={teacherName} onChange={(e) => setTeacherName(e.target.value)} placeholder={tr("اسم المعلمة", "Teacher's name")}
+        className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mb-3" />
+
+      <div className="space-y-3">
+        {DOMAINS.map((d) => (
+          <div key={d.id} className="bg-white rounded-xl p-2.5 border border-slate-100">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span>{d.icon}</span>
+              <div>
+                <div className="text-xs font-bold text-slate-700">{tr(d.ar, d.en)}</div>
+                <div className="text-[10px] text-slate-400">{tr(d.sub.ar, d.sub.en)}</div>
+              </div>
+            </div>
+            <StarRating value={ratings[d.id]} onChange={(v) => setRatings((r) => ({ ...r, [d.id]: v }))} />
+            <textarea value={observations[d.id] || ""} onChange={(e) => setObservations((o) => ({ ...o, [d.id]: e.target.value }))}
+              placeholder={tr(d.placeholder.ar, d.placeholder.en)} rows={2}
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] mt-1.5" />
+            <input value={nextSteps[d.id] || ""} onChange={(e) => setNextSteps((n) => ({ ...n, [d.id]: e.target.value }))}
+              placeholder={tr("الخطوة التالية...", "Next step...")}
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] mt-1.5" />
+          </div>
+        ))}
+      </div>
+
+      <p className="text-[11px] font-bold text-slate-500 mt-3 mb-1.5">{tr("علامات تستدعي انتباهاً خاصاً", "Flags needing special attention")}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {EVAL_FLAGS[lang].map((f) => (
+          <Chip key={f.id} label={f.label} active={flags.includes(f.id)} onClick={() => toggleFlag(f.id)} />
+        ))}
+      </div>
+      {activeFlagAlerts.length > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-2.5 mt-2 text-[11px] text-rose-600 leading-relaxed">
+          {activeFlagAlerts.map((f) => (<p key={f.id}>{f.alert}</p>))}
+        </div>
+      )}
+
+      <textarea value={generalNote} onChange={(e) => setGeneralNote(e.target.value)} placeholder={tr("ملاحظة عامة (اختياري)", "General note (optional)")} rows={2}
+        className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mt-3" />
+
+      <button onClick={save} disabled={saving} className="w-full bg-sky-500 text-white font-bold py-2 rounded-xl text-xs mt-3 disabled:opacity-60">
+        {saving ? tr("جارِ الحفظ...", "Saving...") : tr("حفظ التقييم الشهري", "Save monthly evaluation")}
+      </button>
+
+      {evaluations.length > 0 && (
+        <div className="mt-3 pt-2 border-t border-slate-200 space-y-1">
+          <p className="text-[11px] font-bold text-slate-400">{tr("تقييمات سابقة", "Past evaluations")}</p>
+          {evaluations.map((e) => (
+            <div key={e.id} className="text-[11px] text-slate-500 flex items-center gap-2">
+              <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {e.month}{e.flags?.length ? ` — ⚑ ${e.flags.length}` : ""}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -404,6 +569,8 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
             </div>
           )}
         </div>
+
+        <MonthlyEvalSection tr={tr} lang={lang} reg={reg} token={token} showToast={showToast} />
 
         <button onClick={deleteRegistration} disabled={deleting} className="w-full bg-white text-rose-500 border border-rose-200 font-bold py-2.5 rounded-xl text-xs disabled:opacity-60">
           {deleting ? tr("جارِ المسح...", "Deleting...") : tr("🗑 مسح ملف الطفل نهائيًا", "🗑 Permanently delete this child's file")}

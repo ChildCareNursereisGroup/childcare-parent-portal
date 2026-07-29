@@ -291,6 +291,54 @@ Deno.serve(async (req) => {
       return json({ reports: data || [] });
     }
 
+    if (action === "save_evaluation") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      const { registration_id, month, teacher_name, ratings, observations, next_steps, flags, general_note } = body;
+      if (!month) return json({ error: "الشهر مطلوب" }, 400);
+      const { data: reg, error: regErr } = await admin
+        .from("portal_registrations")
+        .select("id, parent_user_id")
+        .eq("id", registration_id)
+        .eq("branch", branch)
+        .single();
+      if (regErr || !reg) return json({ error: "الطفل غير موجود" }, 404);
+
+      const { error } = await admin.from("monthly_evaluations").upsert(
+        {
+          registration_id,
+          parent_user_id: reg.parent_user_id,
+          branch,
+          month,
+          teacher_name: teacher_name || null,
+          ratings: ratings || {},
+          observations: observations || {},
+          next_steps: next_steps || {},
+          flags: Array.isArray(flags) ? flags : [],
+          general_note: general_note || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "registration_id,month" }
+      );
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true });
+    }
+
+    if (action === "list_evaluations") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      const { registration_id } = body;
+      const { data, error } = await admin
+        .from("monthly_evaluations")
+        .select("*")
+        .eq("registration_id", registration_id)
+        .eq("branch", branch)
+        .order("month", { ascending: false })
+        .limit(24);
+      if (error) return json({ error: error.message }, 500);
+      return json({ evaluations: data || [] });
+    }
+
     if (action === "admin_get_passwords") {
       if (!(await requireAdmin())) return json({ error: "غير مصرح لك" }, 403);
       const { data, error } = await admin
