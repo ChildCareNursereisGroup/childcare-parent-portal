@@ -4,7 +4,7 @@ import {
   Bell, LogOut, Upload, FileText, MessageCircle, CheckCircle2, Circle,
   Droplet, Moon, Smile, UtensilsCrossed, Plus, X, AlertCircle,
   Sparkles, Check, Globe, MapPin, Phone, Facebook, Instagram, ChevronRight,
-  Building2
+  Building2, Music2
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import { BranchLogin, BranchAdminScreen, DOMAINS } from "./BranchAdmin";
@@ -16,6 +16,7 @@ const useLang = () => useContext(LangCtx);
 
 // ---------------- data ----------------
 const GROUP_WHATSAPP_CHANNEL = "whatsapp.com/channel/0029Vaa6ncZAYlUR5xH3YV2v";
+const GROUP_TIKTOK = "tiktok.com/@child.care.nurser";
 
 const BRANCHES = [
   {
@@ -585,6 +586,11 @@ function BranchScreen() {
           <span className="text-xs text-slate-400 flex-1" dir="ltr">{b.ig}</span>
           <Instagram className="w-4 h-4 text-pink-500" />
           <span className="text-sm font-bold text-slate-700">Instagram</span>
+        </div>
+        <div className="flex items-center gap-3 p-4">
+          <span className="text-xs text-slate-400 flex-1" dir="ltr">{GROUP_TIKTOK}</span>
+          <Music2 className="w-4 h-4 text-slate-800" />
+          <span className="text-sm font-bold text-slate-700">TikTok</span>
         </div>
       </div>
 
