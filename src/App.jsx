@@ -9,6 +9,7 @@ import {
 import { supabase } from "./lib/supabaseClient";
 import { BranchLogin, BranchAdminScreen, DOMAINS } from "./BranchAdmin";
 import { generateFormPdfBlob } from "./lib/pdfExport";
+import { TERMS, CONSENTS, TERMS_VERSION } from "./terms";
 
 // ---------------- i18n ----------------
 const LangCtx = createContext({ lang: "ar", tr: (a) => a });
@@ -166,14 +167,15 @@ function StatusChip({ ok, label }) {
     </span>
   );
 }
-function Field({ label, type = "text", value, onChange }) {
+function Field({ label, type = "text", value, onChange, req, inputMode, autoComplete, ltr }) {
   const { lang } = useLang();
   return (
     <div>
-      <label className="text-xs font-bold text-slate-500 block mb-1" style={{ textAlign: lang === "ar" ? "right" : "left" }}>{label}</label>
-      <input type={type} value={value || ""} onChange={onChange}
-        style={{ textAlign: lang === "ar" ? "right" : "left" }}
-        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400" />
+      <label className="text-xs font-bold text-slate-500 block mb-1" style={{ textAlign: lang === "ar" ? "right" : "left" }}>{label}{req && <span className="text-rose-500"> *</span>}</label>
+      <input type={type} inputMode={inputMode} autoComplete={autoComplete} value={value || ""} onChange={onChange}
+        dir={ltr ? "ltr" : undefined}
+        style={{ textAlign: ltr ? "left" : lang === "ar" ? "right" : "left" }}
+        className="w-full border border-slate-200 bg-white rounded-2xl px-3.5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300" />
     </div>
   );
 }
@@ -188,11 +190,11 @@ function TextArea({ label, value, onChange, rows = 3 }) {
     </div>
   );
 }
-function Select({ label, options, value, onChange, other, onOtherChange }) {
+function Select({ label, options, value, onChange, other, onOtherChange, req }) {
   const { lang, tr } = useLang();
   return (
     <div>
-      <label className="text-xs font-bold text-slate-500 block mb-1" style={{ textAlign: lang === "ar" ? "right" : "left" }}>{label}</label>
+      {label && <label className="text-xs font-bold text-slate-500 block mb-1" style={{ textAlign: lang === "ar" ? "right" : "left" }}>{label}{req && <span className="text-rose-500"> *</span>}</label>}
       <div className="flex flex-wrap gap-1.5 justify-end" dir={lang === "ar" ? "rtl" : "ltr"}>
         {options.map((o) => {
           const { en, ar } = split(o);
@@ -200,7 +202,7 @@ function Select({ label, options, value, onChange, other, onOtherChange }) {
           const active = value === val;
           return (
             <button key={val} type="button" onClick={() => onChange(val)}
-              className={`text-[11px] px-2.5 py-1.5 rounded-full border font-bold ${active ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-500 border-slate-200"}`}>
+              className={`text-xs px-3.5 py-2 rounded-full border font-bold transition ${active ? "bg-gradient-to-l from-sky-500 to-cyan-400 text-white border-transparent shadow-sm" : "bg-white text-slate-500 border-slate-200"}`}>
               {tr(ar, en)}
             </button>
           );
@@ -209,7 +211,7 @@ function Select({ label, options, value, onChange, other, onOtherChange }) {
       {value === "Other" && (
         <input value={other || ""} onChange={onOtherChange} placeholder={tr("حددي...", "Please specify...")}
           style={{ textAlign: lang === "ar" ? "right" : "left" }}
-          className="w-full mt-2 border border-slate-200 rounded-xl px-3 py-2 text-sm" />
+          className="w-full mt-2 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-sm" />
       )}
     </div>
   );
@@ -221,7 +223,7 @@ function YesNo({ label, value, onChange }) {
       <div className="flex gap-1.5">
         {["yes", "no"].map((v) => (
           <button key={v} type="button" onClick={() => onChange(v)}
-            className={`text-[11px] px-3 py-1.5 rounded-full border font-bold ${value === v ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-500 border-slate-200"}`}>
+            className={`text-xs px-4 py-2 rounded-full border font-bold ${value === v ? "bg-gradient-to-l from-sky-500 to-cyan-400 text-white border-transparent" : "bg-white text-slate-500 border-slate-200"}`}>
             {v === "yes" ? tr("نعم", "Yes") : tr("لا", "No")}
           </button>
         ))}
@@ -843,23 +845,95 @@ function FeesScreen({ showToast }) {
   );
 }
 
-// ---------------- Register (multi-step, full form) ----------------
-function RegisterForm({ onBack, showToast, standalone }) {
+// ---------------- Register (simplified 7-step form) ----------------
+const DRAFT_KEY = "ccn_registration_draft_v2";
+const imgUrl = (name) => `${import.meta.env.BASE_URL}img/${name}`;
+const STEP_META = [
+  { emoji: "👶", img: "dance.jpg", ar: "بطلنا الصغير", en: "Your little star", hintAr: "نفسنا نتعرّف على طفلك 💙", hintEn: "We'd love to meet your child 💙" },
+  { emoji: "👨‍👩‍👧", img: "entrance.jpg", ar: "الوالدان", en: "Parents", hintAr: "بيانات للتواصل معاكم", hintEn: "How we can reach you" },
+  { emoji: "🛡️", img: "graduation.jpg", ar: "الطوارئ والاستلام", en: "Safety & pickup", hintAr: "علشان طفلك دايماً في أمان", hintEn: "So your child is always safe" },
+  { emoji: "🩺", img: "dance.jpg", ar: "صحة طفلك", en: "Health", hintAr: "نص الطريق خلص! كمّلي 🎉", hintEn: "Halfway there! 🎉" },
+  { emoji: "🗓️", img: "entrance.jpg", ar: "الخطة والرسوم", en: "Plan & fees", hintAr: "اختاري المواعيد المناسبة ليكي", hintEn: "Pick the schedule that suits you" },
+  { emoji: "📎", img: "graduation.jpg", ar: "المستندات", en: "Documents", hintAr: "صور واضحة من الموبايل كفاية", hintEn: "Clear phone photos are enough" },
+  { emoji: "✍️", img: "dance.jpg", ar: "الموافقات والتوقيع", en: "Consent & signature", hintAr: "آخر خطوة — يلا بينا! 🎈", hintEn: "Last step — almost done! 🎈" },
+];
+
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_e) {
+    return null;
+  }
+}
+
+function SectionCard({ emoji, title, color = "sky", children }) {
+  const colors = {
+    sky: "border-sky-100 bg-sky-50/60",
+    pink: "border-pink-100 bg-pink-50/60",
+    amber: "border-amber-100 bg-amber-50/70",
+    emerald: "border-emerald-100 bg-emerald-50/60",
+  };
+  return (
+    <div className={`rounded-3xl border p-3.5 space-y-3 ${colors[color]}`}>
+      <p className="text-sm font-extrabold text-slate-700 text-right">{emoji} {title}</p>
+      {children}
+    </div>
+  );
+}
+
+function Collapse({ title, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between px-3.5 py-3">
+        <ChevronLeft className={`w-4 h-4 text-slate-400 transition ${open ? "-rotate-90" : ""}`} />
+        <span className="text-xs font-bold text-slate-600">{title}</span>
+      </button>
+      {open && <div className="px-3.5 pb-3.5 space-y-3">{children}</div>}
+    </div>
+  );
+}
+
+function YesNoDetail({ label, value, detail, onValue, onDetail }) {
   const { tr } = useLang();
-  const [step, setStep] = useState(0);
-  const [f, setF] = useState({});
+  return (
+    <div className="space-y-2">
+      <YesNo label={label} value={value} onChange={onValue} />
+      {value === "yes" && (
+        <Field label={tr("اكتبي التفاصيل", "Please give details")} value={detail} onChange={onDetail} req />
+      )}
+    </div>
+  );
+}
+
+function RegisterForm({ onBack, showToast, standalone }) {
+  const { tr, lang } = useLang();
+  const today = new Date().toISOString().slice(0, 10);
+  const draft = useRef(loadDraft()).current;
+  const [step, setStep] = useState(draft?.step || 0);
+  const [f, setF] = useState(draft?.f || { sigDate: today, frequency: "monthly" });
   const [submitting, setSubmitting] = useState(false);
-  const [regId] = useState(() => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`));
-  const [files, setFiles] = useState({});
+  const [regId] = useState(() => draft?.regId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`));
+  const [files, setFiles] = useState(draft?.files || {});
+  const [restored] = useState(!!draft);
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
   const setEv = (k) => (e) => set(k)(e.target.value);
-  const toggleSkill = (k) => setF((s) => ({ ...s, skills: { ...(s.skills || {}), [k]: !(s.skills || {})[k] } }));
   const setArrayItem = (key, idx, field) => (e) =>
     setF((s) => {
       const arr = [...(s[key] || [])];
       arr[idx] = { ...arr[idx], [field]: e.target.value };
       return { ...s, [key]: arr };
     });
+  const setConsent = (k, v) => setF((s) => ({ ...s, consents: { ...(s.consents || {}), [k]: v } }));
+
+  // Autosave so a parent never loses progress if the page closes.
+  useEffect(() => {
+    try {
+      const { signatureDataUrl, ...rest } = f;
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ f: rest, step, regId, files }));
+    } catch (_e) { /* storage unavailable */ }
+  }, [f, step, regId, files]);
 
   const uploadFile = async (key, file) => {
     setFiles((s) => ({ ...s, [key]: { status: "uploading", name: file.name } }));
@@ -874,66 +948,35 @@ function RegisterForm({ onBack, showToast, standalone }) {
   };
   const anyUploading = Object.values(files).some((x) => x.status === "uploading");
 
-  const steps = [
-    tr("بيانات الطفل", "Child Info"),
-    tr("بيانات الأب", "Father"),
-    tr("بيانات الأم", "Mother"),
-    tr("الإخوة والطوارئ", "Siblings & Emergency"),
-    tr("الاستلام", "Pickup"),
-    tr("الحالة الصحية", "Health"),
-    tr("عن الطفل ومهاراته", "About & Skills"),
-    tr("العادات والموافقة", "Habits & Consent"),
-    tr("الخطة والرسوم", "Plan & Fees"),
-    tr("المستندات المطلوبة", "Required Documents"),
-    tr("الإقرار والتوقيع", "Acknowledgement"),
-  ];
+  const steps = STEP_META.map((m) => tr(m.ar, m.en));
+  const meta = STEP_META[step];
 
-  const otherOk = (val, otherVal) => val !== "Other" || !!otherVal;
   const yesNoDetailOk = (val, detail) => !!val && (val === "no" || !!detail);
+  const parentOk = (p) => !!(f[`${p}Name`] && f[`${p}Id`] && f[`${p}Mobile`] && f[`${p}Email`]);
 
   const stepValid = () => {
     switch (step) {
       case 0:
-        return !!(f.name && f.nick && f.dob && f.gender &&
-          f.nat && otherOk(f.nat, f.natOther) &&
-          f.religion && otherOk(f.religion, f.religionOther) &&
-          f.lang1 && otherOk(f.lang1, f.lang1Other) &&
-          f.langOther && f.address && f.transport && f.branch);
+        return !!(f.branch && f.name && f.dob && f.gender && f.nat && (f.nat !== "Other" || f.natOther) && f.address);
       case 1:
-        return !!(f.fName &&
-          f.fNat && otherOk(f.fNat, f.fNatOther) &&
-          f.fLang && otherOk(f.fLang, f.fLangOther) &&
-          f.fId && f.fJob &&
-          f.fCity && otherOk(f.fCity, f.fCityOther) &&
-          f.fHome && f.fMobile && f.fEmail && f.marital);
+        return !!f.marital && (f.marital === "widowed" ? (parentOk("f") || parentOk("m")) : (parentOk("f") && parentOk("m")));
       case 2:
-        return !!(f.mName &&
-          f.mNat && otherOk(f.mNat, f.mNatOther) &&
-          f.mLang && otherOk(f.mLang, f.mLangOther) &&
-          f.mId && f.mJob &&
-          f.mCity && otherOk(f.mCity, f.mCityOther) &&
-          f.mHome && f.mMobile && f.mEmail);
+        return !!(f.emName && f.emRel && f.emMobile);
       case 3:
-        return !!(f.emName && f.emRel && f.emMobile && f.emHome);
-      case 4:
-        return true; // authorized pickup persons are optional
-      case 5:
         return yesNoDetailOk(f.illness, f.illnessDetail) &&
           yesNoDetailOk(f.meds, f.medsDetail) &&
           yesNoDetailOk(f.allergy, f.allergyDetail) &&
-          !!(f.blood && f.vax && f.glasses && f.hearing && f.doctor);
-      case 6:
-        return !!(f.order && f.hobbies && f.colors && f.personality && f.loves && f.fears);
-      case 7:
-        return !!(f.sleepHrs && f.sleepAlone && f.foodLike && f.foodNo && f.pacifier && f.media);
-      case 8:
+          yesNoDetailOk(f.special, f.specialDetail) &&
+          !!(f.blood && f.vax);
+      case 4:
         return !!(f.plan && f.transportPlan);
-      case 9:
+      case 5:
         return files.fatherId?.status === "done" && files.motherId?.status === "done" &&
           files.childPhoto?.status === "done" &&
           (files.vaxCard?.status === "done" || !!f.vaxPledge);
-      case 10:
-        return !!(f.agree && f.sigName && f.sigId && f.sigDate && f.signatureDataUrl);
+      case 6:
+        return CONSENTS.every((c) => f.consents?.[c.key]) && !!f.media &&
+          !!(f.sigName && f.sigId && f.sigDate && f.signatureDataUrl);
       default:
         return true;
     }
@@ -941,9 +984,11 @@ function RegisterForm({ onBack, showToast, standalone }) {
 
   const next = () => { if (stepValid()) setStep((s) => Math.min(s + 1, steps.length - 1)); };
   const back = () => (step === 0 ? onBack() : setStep((s) => s - 1));
+  const remainingMin = Math.max(1, Math.round(((steps.length - step) * 0.8)));
 
   const submit = async () => {
     setSubmitting(true);
+    const formData = { ...f, termsVersion: TERMS_VERSION, consentedAt: new Date().toISOString(), consentLang: lang };
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -968,7 +1013,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
     let fullFormPath = null;
     try {
       const pdfBlob = await generateFormPdfBlob({
-        f,
+        f: formData,
         branchLabel: selectedBranch ? selectedBranch.name.ar : f.branch,
         billing: { recurring_fee: recurringFee, one_time_fee: oneTimeFee },
         signatureDataUrl: f.signatureDataUrl || null,
@@ -984,7 +1029,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
       branch: selectedBranch?.key || f.branch || null,
       contact_email: contactEmail,
       parent_user_id: user?.id || null,
-      form_data: f,
+      form_data: formData,
       documents: {
         father_id: files.fatherId?.path || null,
         mother_id: files.motherId?.path || null,
@@ -1010,6 +1055,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
       showToast(tr("حصل خطأ أثناء إرسال الاستمارة، حاولي مرة أخرى", "Something went wrong submitting the form, please try again"));
       return;
     }
+    try { localStorage.removeItem(DRAFT_KEY); } catch (_e) { /* ignore */ }
     if (standalone) {
       showToast(tr("تم استلام طلبك! هتتراجع الإدارة عليه وتبعتلك رابط الدخول بعد الموافقة", "Application received! Management will review it and send your login link after approval"));
       setTimeout(onBack, 2600);
@@ -1018,161 +1064,146 @@ function RegisterForm({ onBack, showToast, standalone }) {
     }
   };
 
+  const [showRestored, setShowRestored] = useState(restored);
+  const startOver = () => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (_e) { /* ignore */ }
+    setF({ sigDate: today, frequency: "monthly" });
+    setFiles({});
+    setStep(0);
+    setShowRestored(false);
+  };
+
   return (
-    <div className="h-full flex flex-col">
-      <TopBar title={`${steps[step]} · ${step + 1}/${steps.length}`} onBack={back} />
-      <StepDots step={step} total={steps.length} />
+    <div className="h-full flex flex-col bg-gradient-to-b from-amber-50/60 to-white">
+      <div className="relative h-28 shrink-0 overflow-hidden">
+        <img src={imgUrl(meta.img)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/85 via-slate-900/25 to-sky-500/30" />
+        <button onClick={back} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/25 backdrop-blur flex items-center justify-center text-white">
+          <ChevronLeft className={`w-4 h-4 ${lang === "en" ? "rotate-180" : ""}`} />
+        </button>
+        <div className="absolute bottom-2.5 inset-x-4 text-white text-right">
+          <p className="text-lg font-extrabold drop-shadow">{meta.emoji} {tr(meta.ar, meta.en)}</p>
+          <p className="text-[11px] opacity-90">{tr(meta.hintAr, meta.hintEn)}</p>
+        </div>
+      </div>
+
+      <div className="px-4 pt-2.5 pb-1">
+        <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+          <div className="h-full rounded-full bg-gradient-to-l from-amber-400 to-orange-500 transition-all" style={{ width: `${((step + 1) / steps.length) * 100}%` }} />
+        </div>
+        <p className="text-[10.5px] text-slate-400 mt-1 text-center">
+          {tr(`الخطوة ${step + 1} من ${steps.length} · باقي حوالي ${remainingMin} دقيقة`, `Step ${step + 1} of ${steps.length} · about ${remainingMin} min left`)}
+        </p>
+      </div>
+
       <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-3">
+        {showRestored && (
+          <div className="bg-sky-50 border border-sky-100 rounded-2xl p-3 flex items-center justify-between gap-2">
+            <button onClick={startOver} className="text-[11px] font-bold text-rose-500 shrink-0">{tr("ابدأي من جديد", "Start over")}</button>
+            <p className="text-[11px] text-sky-700 text-right">{tr("رجّعنالك بياناتك المحفوظة 💾", "We restored your saved progress 💾")}</p>
+          </div>
+        )}
 
         {step === 0 && (<>
-          <Field label={tr("اسم الطفل رباعياً", "Child's full name")} value={f.name} onChange={setEv("name")} />
-          <Field label={tr("اسم الشهرة / التدليل", "Nickname")} value={f.nick} onChange={setEv("nick")} />
-          <Field label={tr("تاريخ الميلاد", "Date of birth")} type="date" value={f.dob} onChange={setEv("dob")} />
-          <div className="flex items-center justify-between">
-            <div className="flex gap-1.5">
-              {["boy", "girl"].map((v) => (
-                <button key={v} onClick={() => set("gender")(v)} className={`text-[11px] px-3 py-1.5 rounded-full border font-bold ${f.gender === v ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-500 border-slate-200"}`}>
-                  {v === "boy" ? tr("ذكر", "Boy") : tr("أنثى", "Girl")}
-                </button>
-              ))}
+          <SectionCard emoji="🏫" title={tr("اختاري الفرع", "Choose the branch")} color="amber">
+            <Select label="" options={BRANCHES.map((b) => `${b.name.en}|${b.name.ar}`)} value={f.branch} onChange={set("branch")} />
+          </SectionCard>
+          <SectionCard emoji="🧒" title={tr("بيانات الطفل", "Child details")} color="sky">
+            <Field req label={tr("اسم الطفل رباعياً", "Child's full name")} value={f.name} onChange={setEv("name")} />
+            <Field label={tr("اسم الشهرة (اختياري)", "Nickname (optional)")} value={f.nick} onChange={setEv("nick")} />
+            <Field req label={tr("تاريخ الميلاد", "Date of birth")} type="date" value={f.dob} onChange={setEv("dob")} />
+            <div className="flex items-center justify-between">
+              <div className="flex gap-1.5">
+                {["boy", "girl"].map((v) => (
+                  <button key={v} type="button" onClick={() => set("gender")(v)} className={`text-xs px-4 py-2 rounded-full border font-bold ${f.gender === v ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-500 border-slate-200"}`}>
+                    {v === "boy" ? tr("👦 ذكر", "👦 Boy") : tr("👧 أنثى", "👧 Girl")}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs font-bold text-slate-600">{tr("النوع", "Gender")} <span className="text-rose-500">*</span></span>
             </div>
-            <span className="text-xs font-bold text-slate-600">{tr("النوع", "Gender")}</span>
-          </div>
-          <Select label={tr("الجنسية", "Nationality")} options={NATIONALITIES} value={f.nat} onChange={set("nat")} other={f.natOther} onOtherChange={setEv("natOther")} />
-          <Select label={tr("الديانة", "Religion")} options={RELIGIONS} value={f.religion} onChange={set("religion")} other={f.religionOther} onOtherChange={setEv("religionOther")} />
-          <Select label={tr("اللغة الأولى للطفل", "Child's first language")} options={LANGUAGES} value={f.lang1} onChange={set("lang1")} other={f.lang1Other} onOtherChange={setEv("lang1Other")} />
-          <Field label={tr("لغات أخرى في المنزل", "Other languages at home")} value={f.langOther} onChange={setEv("langOther")} />
-          <Field label={tr("العنوان", "Address")} value={f.address} onChange={setEv("address")} />
-          <div className="flex items-center justify-between">
-            <div className="flex gap-1.5">
-              {["bus", "parent"].map((v) => (
-                <button key={v} onClick={() => set("transport")(v)} className={`text-[11px] px-3 py-1.5 rounded-full border font-bold ${f.transport === v ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-500 border-slate-200"}`}>
-                  {v === "bus" ? tr("باص الحضانة", "Nursery bus") : tr("مع ولي الأمر", "With parent")}
-                </button>
-              ))}
-            </div>
-            <span className="text-xs font-bold text-slate-600">{tr("المواصلات", "Transport")}</span>
-          </div>
-          <Select label={tr("الفرع", "Branch")} options={BRANCHES.map((b) => `${b.name.en}|${b.name.ar}`)} value={f.branch} onChange={set("branch")} />
+            <Select req label={tr("الجنسية", "Nationality")} options={NATIONALITIES} value={f.nat} onChange={set("nat")} other={f.natOther} onOtherChange={setEv("natOther")} />
+            <Field req label={tr("عنوان السكن", "Home address")} value={f.address} onChange={setEv("address")} autoComplete="street-address" />
+          </SectionCard>
+          <Collapse title={tr("معلومات إضافية (اختياري)", "More details (optional)")}>
+            <Select label={tr("الديانة", "Religion")} options={RELIGIONS} value={f.religion} onChange={set("religion")} other={f.religionOther} onOtherChange={setEv("religionOther")} />
+            <Select label={tr("اللغة الأولى للطفل", "Child's first language")} options={LANGUAGES} value={f.lang1} onChange={set("lang1")} other={f.lang1Other} onOtherChange={setEv("lang1Other")} />
+          </Collapse>
         </>)}
 
         {step === 1 && (<>
-          <Field label={tr("اسم الأب", "Father's name")} value={f.fName} onChange={setEv("fName")} />
-          <Select label={tr("الجنسية", "Nationality")} options={NATIONALITIES} value={f.fNat} onChange={set("fNat")} other={f.fNatOther} onOtherChange={setEv("fNatOther")} />
-          <Select label={tr("اللغة الأولى", "First language")} options={LANGUAGES} value={f.fLang} onChange={set("fLang")} other={f.fLangOther} onOtherChange={setEv("fLangOther")} />
-          <Field label={tr("رقم الهوية / الجواز", "Emirates ID / Passport")} value={f.fId} onChange={setEv("fId")} />
-          <Field label={tr("الوظيفة وجهة العمل", "Occupation & company")} value={f.fJob} onChange={setEv("fJob")} />
-          <Select label={tr("المدينة", "City")} options={CITIES} value={f.fCity} onChange={set("fCity")} other={f.fCityOther} onOtherChange={setEv("fCityOther")} />
-          <Field label={tr("هاتف المنزل", "Home phone")} value={f.fHome} onChange={setEv("fHome")} />
-          <Field label={tr("رقم الهاتف المتحرك", "Mobile number")} value={f.fMobile} onChange={setEv("fMobile")} />
-          <Field label={tr("البريد الإلكتروني", "Email")} value={f.fEmail} onChange={setEv("fEmail")} />
-          <div className="flex items-center justify-between">
-            <div className="flex gap-1.5 flex-wrap">
-              {["married", "separated", "widowed"].map((v) => (
-                <button key={v} onClick={() => set("marital")(v)} className={`text-[11px] px-3 py-1.5 rounded-full border font-bold ${f.marital === v ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-500 border-slate-200"}`}>
-                  {tr({ married: "متزوجان", separated: "منفصلان", widowed: "أرمل/أرملة" }[v], v[0].toUpperCase() + v.slice(1))}
-                </button>
-              ))}
-            </div>
-            <span className="text-xs font-bold text-slate-600">{tr("الحالة الاجتماعية", "Marital status")}</span>
-          </div>
+          <SectionCard emoji="👨" title={tr("الأب", "Father")} color="sky">
+            <Field req label={tr("الاسم", "Name")} value={f.fName} onChange={setEv("fName")} />
+            <Field req label={tr("رقم الهوية الإماراتية / الجواز", "Emirates ID / Passport no.")} value={f.fId} onChange={setEv("fId")} inputMode="numeric" />
+            <Field req label={tr("رقم الجوال", "Mobile")} type="tel" value={f.fMobile} onChange={setEv("fMobile")} inputMode="tel" autoComplete="tel" ltr />
+            <Field req label={tr("البريد الإلكتروني", "Email")} type="email" value={f.fEmail} onChange={setEv("fEmail")} inputMode="email" autoComplete="email" ltr />
+            <Field label={tr("الوظيفة (اختياري)", "Occupation (optional)")} value={f.fJob} onChange={setEv("fJob")} />
+          </SectionCard>
+          <SectionCard emoji="👩" title={tr("الأم", "Mother")} color="pink">
+            <Field req label={tr("الاسم", "Name")} value={f.mName} onChange={setEv("mName")} />
+            <Field req label={tr("رقم الهوية الإماراتية / الجواز", "Emirates ID / Passport no.")} value={f.mId} onChange={setEv("mId")} inputMode="numeric" />
+            <Field req label={tr("رقم الجوال", "Mobile")} type="tel" value={f.mMobile} onChange={setEv("mMobile")} inputMode="tel" ltr />
+            <Field req label={tr("البريد الإلكتروني", "Email")} type="email" value={f.mEmail} onChange={setEv("mEmail")} inputMode="email" ltr />
+            <Field label={tr("الوظيفة (اختياري)", "Occupation (optional)")} value={f.mJob} onChange={setEv("mJob")} />
+          </SectionCard>
+          <SectionCard emoji="💍" title={tr("الحالة الاجتماعية للوالدين", "Parents' marital status")} color="amber">
+            <Select req label="" options={["married|متزوجان", "separated|منفصلان", "widowed|أرمل/أرملة"]} value={f.marital} onChange={set("marital")} />
+            {f.marital === "widowed" && <p className="text-[11px] text-amber-700 text-right">{tr("يكفي إدخال بيانات أحد الوالدين.", "Details of one parent are enough.")}</p>}
+          </SectionCard>
         </>)}
 
         {step === 2 && (<>
-          <Field label={tr("اسم الأم", "Mother's name")} value={f.mName} onChange={setEv("mName")} />
-          <Select label={tr("الجنسية", "Nationality")} options={NATIONALITIES} value={f.mNat} onChange={set("mNat")} other={f.mNatOther} onOtherChange={setEv("mNatOther")} />
-          <Select label={tr("اللغة الأولى", "First language")} options={LANGUAGES} value={f.mLang} onChange={set("mLang")} other={f.mLangOther} onOtherChange={setEv("mLangOther")} />
-          <Field label={tr("رقم الهوية / الجواز", "Emirates ID / Passport")} value={f.mId} onChange={setEv("mId")} />
-          <Field label={tr("الوظيفة وجهة العمل", "Occupation & company")} value={f.mJob} onChange={setEv("mJob")} />
-          <Select label={tr("المدينة", "City")} options={CITIES} value={f.mCity} onChange={set("mCity")} other={f.mCityOther} onOtherChange={setEv("mCityOther")} />
-          <Field label={tr("هاتف المنزل", "Home phone")} value={f.mHome} onChange={setEv("mHome")} />
-          <Field label={tr("رقم الهاتف المتحرك", "Mobile number")} value={f.mMobile} onChange={setEv("mMobile")} />
-          <Field label={tr("البريد الإلكتروني", "Email")} value={f.mEmail} onChange={setEv("mEmail")} />
+          <SectionCard emoji="🚨" title={tr("جهة اتصال للطوارئ", "Emergency contact")} color="pink">
+            <Field req label={tr("الاسم", "Name")} value={f.emName} onChange={setEv("emName")} />
+            <Field req label={tr("صلة القرابة", "Relationship")} value={f.emRel} onChange={setEv("emRel")} />
+            <Field req label={tr("رقم الجوال", "Mobile")} type="tel" value={f.emMobile} onChange={setEv("emMobile")} inputMode="tel" ltr />
+          </SectionCard>
+          <SectionCard emoji="🤝" title={tr("المصرّح لهم باستلام الطفل (اختياري)", "Authorized pickup persons (optional)")} color="emerald">
+            <p className="text-[11px] text-emerald-700 text-right leading-relaxed">{tr("لن يُسلَّم الطفل إلا لوالديه أو لشخص مذكور هنا مع إبراز الهوية.", "The child is released only to the parents or someone listed here, with ID shown.")}</p>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-white border border-emerald-100 rounded-2xl p-3 space-y-1.5">
+                <p className="text-[11px] font-bold text-slate-400 text-right">{tr(`الشخص ${i + 1}`, `Person ${i + 1}`)}</p>
+                <input placeholder={tr("الاسم", "Name")} value={f.pickupPersons?.[i]?.name || ""} onChange={setArrayItem("pickupPersons", i, "name")} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" />
+                <div className="grid grid-cols-2 gap-1.5">
+                  <input placeholder={tr("صلة القرابة", "Relationship")} value={f.pickupPersons?.[i]?.relation || ""} onChange={setArrayItem("pickupPersons", i, "relation")} className="border border-slate-200 rounded-xl px-2.5 py-2 text-xs" />
+                  <input placeholder={tr("رقم الهاتف", "Phone")} inputMode="tel" value={f.pickupPersons?.[i]?.phone || ""} onChange={setArrayItem("pickupPersons", i, "phone")} className="border border-slate-200 rounded-xl px-2.5 py-2 text-xs" />
+                </div>
+                <input placeholder={tr("رقم الهوية", "ID number")} value={f.pickupPersons?.[i]?.idNumber || ""} onChange={setArrayItem("pickupPersons", i, "idNumber")} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" />
+              </div>
+            ))}
+          </SectionCard>
+          <Collapse title={tr("إخوة الطفل (اختياري)", "Siblings (optional)")}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="grid grid-cols-3 gap-1.5">
+                <input placeholder={tr("الاسم", "Name")} value={f.siblings?.[i]?.name || ""} onChange={setArrayItem("siblings", i, "name")} className="border border-slate-200 rounded-xl px-2 py-2 text-xs" />
+                <input placeholder={tr("الميلاد", "DOB")} value={f.siblings?.[i]?.dob || ""} onChange={setArrayItem("siblings", i, "dob")} className="border border-slate-200 rounded-xl px-2 py-2 text-xs" />
+                <input placeholder={tr("المدرسة", "School")} value={f.siblings?.[i]?.school || ""} onChange={setArrayItem("siblings", i, "school")} className="border border-slate-200 rounded-xl px-2 py-2 text-xs" />
+              </div>
+            ))}
+          </Collapse>
         </>)}
 
         {step === 3 && (<>
-          <p className="text-xs font-bold text-slate-500">{tr("تفاصيل الإخوة (إن وجدوا)", "Siblings (if any)")}</p>
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="grid grid-cols-3 gap-1.5">
-              <input placeholder={tr("الاسم", "Name")} value={f.siblings?.[i]?.name || ""} onChange={setArrayItem("siblings", i, "name")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
-              <input placeholder={tr("الميلاد", "DOB")} value={f.siblings?.[i]?.dob || ""} onChange={setArrayItem("siblings", i, "dob")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
-              <input placeholder={tr("المدرسة", "School")} value={f.siblings?.[i]?.school || ""} onChange={setArrayItem("siblings", i, "school")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
-            </div>
-          ))}
-          <div className="h-px bg-slate-100 my-1" />
-          <p className="text-xs font-bold text-slate-500">{tr("جهة اتصال إضافية للطوارئ", "Additional emergency contact")}</p>
-          <Field label={tr("الاسم", "Name")} value={f.emName} onChange={setEv("emName")} />
-          <Field label={tr("صلة القرابة", "Relationship")} value={f.emRel} onChange={setEv("emRel")} />
-          <Field label={tr("رقم الجوال", "Mobile number")} value={f.emMobile} onChange={setEv("emMobile")} />
-          <Field label={tr("هاتف المنزل / العمل", "Home / work number")} value={f.emHome} onChange={setEv("emHome")} />
+          <SectionCard emoji="🩺" title={tr("الحالة الصحية", "Health")} color="emerald">
+            <YesNoDetail label={tr("أمراض مزمنة؟", "Chronic illness?")} value={f.illness} detail={f.illnessDetail} onValue={set("illness")} onDetail={setEv("illnessDetail")} />
+            <YesNoDetail label={tr("أدوية منتظمة؟", "Regular medication?")} value={f.meds} detail={f.medsDetail} onValue={set("meds")} onDetail={setEv("medsDetail")} />
+            <YesNoDetail label={tr("حساسية (أطعمة/أدوية)؟", "Allergies (food/medicine)?")} value={f.allergy} detail={f.allergyDetail} onValue={set("allergy")} onDetail={setEv("allergyDetail")} />
+            <YesNoDetail label={tr("احتياجات خاصة / متابعة علاجية؟", "Special needs / ongoing therapy?")} value={f.special} detail={f.specialDetail} onValue={set("special")} onDetail={setEv("specialDetail")} />
+            <YesNo label={tr("التطعيمات مكتملة؟", "Vaccinations up to date?")} value={f.vax} onChange={set("vax")} />
+            <Select req label={tr("فصيلة الدم", "Blood type")} options={BLOOD} value={f.blood} onChange={set("blood")} />
+          </SectionCard>
+          <Collapse title={tr("عن طفلك — اختياري (بيساعدنا نفهمه أكتر)", "About your child — optional (helps us know them)")}>
+            <Field label={tr("أطعمة لا يتناولها (لأي سبب)", "Foods not allowed (any reason)")} value={f.foodNo} onChange={setEv("foodNo")} />
+            <Field label={tr("أطعمة مفضلة", "Favorite foods")} value={f.foodLike} onChange={setEv("foodLike")} />
+            <Field label={tr("هواياته / ألعابه المفضلة", "Favorite hobbies / toys")} value={f.hobbies} onChange={setEv("hobbies")} />
+            <Field label={tr("أكثر شيء يخيفه", "What scares them most")} value={f.fears} onChange={setEv("fears")} />
+            <Select label={tr("شخصية الطفل", "Personality")} options={PERSONALITY} value={f.personality} onChange={set("personality")} />
+            <YesNo label={tr("ينام بمفرده؟", "Sleeps alone?")} value={f.sleepAlone} onChange={set("sleepAlone")} />
+            <YesNo label={tr("يستخدم لهاية/رضّاعة؟", "Uses pacifier/bottle?")} value={f.pacifier} onChange={set("pacifier")} />
+          </Collapse>
         </>)}
 
         {step === 4 && (<>
-          <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-xs text-purple-700">
-            {tr("⚠ لن يُسلَّم الطفل إلا لشخص مذكور هنا، مع إبراز الهوية عند الاستلام.", "⚠ The child will only be released to someone listed here, with ID shown at pickup.")}
-          </div>
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="bg-white border border-slate-100 rounded-xl p-3 space-y-1.5">
-              <p className="text-[11px] font-bold text-slate-400">{tr(`الشخص ${i + 1}`, `Person ${i + 1}`)}</p>
-              <input placeholder={tr("الاسم", "Name")} value={f.pickupPersons?.[i]?.name || ""} onChange={setArrayItem("pickupPersons", i, "name")} className="w-full border border-slate-200 rounded-lg px-2 py-2 text-xs" />
-              <div className="grid grid-cols-2 gap-1.5">
-                <input placeholder={tr("صلة القرابة", "Relationship")} value={f.pickupPersons?.[i]?.relation || ""} onChange={setArrayItem("pickupPersons", i, "relation")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
-                <input placeholder={tr("رقم الهاتف", "Phone")} value={f.pickupPersons?.[i]?.phone || ""} onChange={setArrayItem("pickupPersons", i, "phone")} className="border border-slate-200 rounded-lg px-2 py-2 text-xs" />
-              </div>
-              <input placeholder={tr("رقم الهوية", "ID number")} value={f.pickupPersons?.[i]?.idNumber || ""} onChange={setArrayItem("pickupPersons", i, "idNumber")} className="w-full border border-slate-200 rounded-lg px-2 py-2 text-xs" />
-            </div>
-          ))}
-        </>)}
-
-        {step === 5 && (<>
-          <YesNo label={tr("مرض مزمن؟", "Chronic illness?")} value={f.illness} onChange={set("illness")} />
-          {f.illness === "yes" && <Field label={tr("التفاصيل", "Details")} value={f.illnessDetail} onChange={setEv("illnessDetail")} />}
-          <YesNo label={tr("أدوية منتظمة؟", "Regular medication?")} value={f.meds} onChange={set("meds")} />
-          {f.meds === "yes" && <Field label={tr("اسم الدواء والجرعة", "Medication & dosage")} value={f.medsDetail} onChange={setEv("medsDetail")} />}
-          <YesNo label={tr("حساسية أطعمة/أدوية؟", "Food/medication allergy?")} value={f.allergy} onChange={set("allergy")} />
-          {f.allergy === "yes" && <Field label={tr("التفاصيل والإجراء", "Details & response")} value={f.allergyDetail} onChange={setEv("allergyDetail")} />}
-          <Select label={tr("فصيلة الدم", "Blood type")} options={BLOOD} value={f.blood} onChange={set("blood")} />
-          <YesNo label={tr("التطعيمات مكتملة؟", "Vaccinations up to date?")} value={f.vax} onChange={set("vax")} />
-          <YesNo label={tr("نظارة / سماعة؟", "Glasses / hearing aid?")} value={f.glasses} onChange={set("glasses")} />
-          <YesNo label={tr("مشكلة سمع أو نظر؟", "Hearing/vision problem?")} value={f.hearing} onChange={set("hearing")} />
-          <Field label={tr("طبيب الطفل وهاتفه", "Child's doctor & phone")} value={f.doctor} onChange={setEv("doctor")} />
-        </>)}
-
-        {step === 6 && (<>
-          <div className="flex items-center justify-between">
-            <div className="flex gap-1.5 flex-wrap">
-              {["eldest", "middle", "youngest"].map((v) => (
-                <button key={v} onClick={() => set("order")(v)} className={`text-[11px] px-3 py-1.5 rounded-full border font-bold ${f.order === v ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-500 border-slate-200"}`}>
-                  {tr({ eldest: "الأكبر", middle: "الأوسط", youngest: "الأصغر" }[v], v[0].toUpperCase() + v.slice(1))}
-                </button>
-              ))}
-            </div>
-            <span className="text-xs font-bold text-slate-600">{tr("ترتيبه بين إخوته", "Birth order")}</span>
-          </div>
-          <Field label={tr("الهوايات / الألعاب المفضلة", "Hobbies / favorite toys")} value={f.hobbies} onChange={setEv("hobbies")} />
-          <Field label={tr("الألوان المفضلة", "Favorite colors")} value={f.colors} onChange={setEv("colors")} />
-          <Select label={tr("شخصية الطفل", "Personality")} options={PERSONALITY} value={f.personality} onChange={set("personality")} />
-          <Field label={tr("أكثر شيء يحبه", "What they love most")} value={f.loves} onChange={setEv("loves")} />
-          <Field label={tr("أكثر شيء يخيفه", "What they fear most")} value={f.fears} onChange={setEv("fears")} />
-          <div className="h-px bg-slate-100 my-1" />
-          <p className="text-xs font-bold text-slate-500">{tr("مهارات الطفل", "Child's skills")}</p>
-          {SKILLS.map((s) => { const { en, ar } = split(s); return <CheckRow key={en} label={tr(ar, en)} checked={!!(f.skills || {})[en]} onChange={() => toggleSkill(en)} />; })}
-        </>)}
-
-        {step === 7 && (<>
-          <Field label={tr("عدد ساعات النوم يومياً", "Hours of sleep per day")} value={f.sleepHrs} onChange={setEv("sleepHrs")} />
-          <YesNo label={tr("ينام بمفرده؟", "Sleeps alone?")} value={f.sleepAlone} onChange={set("sleepAlone")} />
-          <Field label={tr("الأطعمة المفضلة", "Favorite foods")} value={f.foodLike} onChange={setEv("foodLike")} />
-          <Field label={tr("الأطعمة الممنوعة", "Foods not allowed")} value={f.foodNo} onChange={setEv("foodNo")} />
-          <YesNo label={tr("يستخدم لهاية/رضّاعة؟", "Uses pacifier/bottle?")} value={f.pacifier} onChange={set("pacifier")} />
-          <div className="h-px bg-slate-100 my-1" />
-          <div className="bg-pink-50 border border-pink-200 rounded-xl p-3 text-xs text-pink-700 leading-relaxed">
-            {tr("موافقة الوسائط: قد تُلتقط صور/فيديوهات للطفل وتُستخدم من الحضانة في منشوراتها. ملكية المواد تعود للحضانة.", "Media consent: photos/videos of the child may be taken and used by the nursery in its publications. Ownership of the media belongs to the nursery.")}
-          </div>
-          <YesNo label={tr("موافقة استخدام الوسائط", "Media consent")} value={f.media} onChange={set("media")} />
-        </>)}
-
-        {step === 8 && (<>
           <p className="text-xs font-bold text-slate-500">{tr("طريقة الدفع", "Payment frequency")}</p>
           <div className="flex gap-1.5 justify-end">
             {FREQUENCIES.map((fr) => (
@@ -1290,7 +1321,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
           })()}
         </>)}
 
-        {step === 9 && (<>
+        {step === 5 && (<>
           <p className="text-xs text-slate-400">{tr("ارفعي صور واضحة للمستندات التالية (JPG, PNG أو PDF)", "Upload clear photos of the following documents (JPG, PNG, or PDF)")}</p>
           <FileUploadRow label={tr("صورة هوية الأب", "Father's ID copy")} status={files.fatherId?.status} fileName={files.fatherId?.name} error={files.fatherId?.error} onSelect={(file) => uploadFile("fatherId", file)} />
           <FileUploadRow label={tr("صورة هوية الأم", "Mother's ID copy")} status={files.motherId?.status} fileName={files.motherId?.name} error={files.motherId?.error} onSelect={(file) => uploadFile("motherId", file)} />
@@ -1306,104 +1337,70 @@ function RegisterForm({ onBack, showToast, standalone }) {
           </button>
         </>)}
 
-        {step === 10 && (<>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-64 overflow-y-auto text-[11px] text-slate-600 leading-relaxed space-y-2">
-            <p>{tr(
-              "1. تُسدد الرسوم الشهرية مقدماً في موعد أقصاه يوم 27 من الشهر السابق لشهر الدراسة؛ ويحق للحضانة عدم قبول الطفل اعتباراً من اليوم الأول من الشهر الجديد حتى استكمال السداد، دون أي مسؤولية عليها عن ذلك.",
-              "1. Monthly fees are paid in advance, no later than the 27th of the month before the study month; the nursery may refuse to admit the child from the 1st of the new month until payment is completed, without any liability."
-            )}</p>
-            <p>{tr(
-              "2. الرسوم المدفوعة (التسجيل / الحجز / الشهرية / أي رسوم إدارية) غير قابلة للاسترداد أو التحويل مهما كانت الأسباب أو الظروف.",
-              "2. Fees paid (registration / reservation / monthly / any administrative fees) are non-refundable and non-transferable for any reason or circumstance."
-            )}</p>
-            <p>{tr(
-              "3. لا يحق استرداد الرسوم أو تخفيضها بسبب غياب الطفل أو مرضه.",
-              "3. No refund or reduction of fees is due for the child's absence or illness."
-            )}</p>
-            <p>{tr(
-              "4. تحتفظ إدارة الحضانة بحق إيقاف تسجيل أي طفل لا يلتزم بالقواعد، أو يظهر سلوكاً غير مقبول، أو يشكل خطراً على نفسه أو على الآخرين، على أن يتم إخطار ولي الأمر كتابياً قبل أسبوع واحد من الإيقاف.",
-              "4. Management reserves the right to suspend the registration of any child who does not comply with the rules, shows unacceptable behavior, or poses a danger to themselves or others, with written notice to the parent one week before suspension."
-            )}</p>
-            <p>{tr(
-              "5. يُرجى عدم إحضار الطفل للحضانة في حال مرضه، مع إبلاغ الإدارة بطبيعة المرض. وفي حال ظهرت على الطفل أعراض مرضية أثناء تواجده بالحضانة، سيتم إبلاغ ولي الأمر فوراً لاصطحابه خلال 30 دقيقة من الاتصال.",
-              "5. Please do not bring the child to the nursery while ill, and inform management of the nature of the illness. If symptoms appear while at the nursery, the parent will be notified immediately to collect the child within 30 minutes of the call."
-            )}</p>
-            <p>{tr(
-              "6. في حال وقوع إصابة أو حادث، يُبلَّغ ولي الأمر فوراً، وفي الحالات الطارئة يُنقل الطفل لأقرب مركز طبي أو مستشفى لتلقي الرعاية اللازمة، دون أن تتحمل الحضانة أي مسؤولية عن مضاعفات ناتجة عن حالة صحية لم يُفصح عنها ولي الأمر.",
-              "6. In case of injury or accident, the parent is notified immediately, and in emergencies the child is transferred to the nearest medical center or hospital, without the nursery bearing responsibility for complications resulting from an undisclosed health condition."
-            )}</p>
-            <p>{tr(
-              "7. يلتزم ولي الأمر بإبلاغ الحضانة مسبقاً بأي حساسية أو نظام غذائي خاص بالطفل.",
-              "7. The parent must inform the nursery in advance of any allergy or special dietary requirements."
-            )}</p>
-            <p>{tr(
-              "8. يُتوقع من ولي الأمر التواصل باحترام وتعاون مع طاقم الحضانة، والالتزام بسياساتها وإجراءاتها المعتمدة.",
-              "8. The parent is expected to communicate respectfully and cooperatively with staff, and comply with the nursery's approved policies and procedures."
-            )}</p>
-            <p>{tr(
-              "9. يجب حضور الطفل بالزي الموحد المعتمد من الحضانة، مع إحضار طقم ملابس إضافي ووجبة خفيفة وزجاجة ماء.",
-              "9. The child must attend in the nursery's approved uniform, with an extra set of clothes, a snack, and a water bottle."
-            )}</p>
-            <p>{tr(
-              "10. لا تتحمل الحضانة مسؤولية فقد أو تلف أي مقتنيات ثمينة يحضرها الطفل معه، ويُنصح بكتابة اسم الطفل على أغراضه الشخصية.",
-              "10. The nursery is not responsible for loss or damage of valuable items brought by the child; it's recommended to label the child's belongings with their name."
-            )}</p>
-            <p>{tr(
-              "11. تُطبَّق رسوم تأخير قدرها 20 درهماً عن كل ساعة تأخير في اصطحاب الطفل بعد موعد الانصراف الرسمي، وكذلك في حال التسليم المبكر خارج المواعيد الرسمية.",
-              "11. A late fee of AED 20 applies per hour of delay picking up the child after official dismissal time, and also for early drop-off outside official hours."
-            )}</p>
-            <p>{tr(
-              "12. يجب استكمال جميع المستندات المطلوبة (الصور الشخصية، صور الهويات، كارت التطعيمات) لإتمام إجراءات تسجيل الطفل.",
-              "12. All required documents (personal photos, ID copies, vaccination card) must be completed to finalize registration."
-            )}</p>
-            <p>{tr(
-              "13. في حال رغبة ولي الأمر بسحب الطفل، يجب تقديم إشعار كتابي مسبق للإدارة بمدة لا تقل عن شهر واحد؛ ولا يحق استرداد أي رسوم مدفوعة عن الفترة الجارية.",
-              "13. To withdraw the child, the parent must give management at least one month's written notice; no fees paid for the current period will be refunded."
-            )}</p>
-            <p>{tr(
-              "14. يفوّض ولي الأمر إدارة الحضانة باتخاذ الإجراءات الإسعافية الأولية اللازمة عند الضرورة القصوى، على أن يتم إبلاغه فوراً بذلك.",
-              "14. The parent authorizes management to take necessary first-aid measures in extreme necessity, and will be notified immediately."
-            )}</p>
-            <p>{tr(
-              "15. لن يُسلَّم الطفل إلا لولي الأمر أو لأحد الأشخاص المصرح لهم المذكورين في هذه الاستمارة، مع إبراز الهوية عند الاستلام.",
-              "15. The child will only be released to the parent or an authorized person listed in this form, with ID shown at pickup."
-            )}</p>
-            <p>{tr(
-              "16. يقر ولي الأمر بصحة واكتمال جميع البيانات الواردة في هذه الاستمارة، ويتحمل وحده المسؤولية الكاملة عن أي ضرر ينتج عن عدم الإفصاح عن معلومة جوهرية.",
-              "16. The parent affirms the accuracy and completeness of all information in this form, and bears sole responsibility for any harm from failing to disclose material information."
-            )}</p>
-            <p>{tr(
-              "17. بتسجيل طفلك في مجموعة رعاية الطفل للحضانات، فإنك تقر وتوافق على جميع القواعد والشروط الواردة في هذه الاستمارة، والمتوافقة مع اشتراطات هيئة الشارقة للتعليم الخاص (سبيا) ووزارة تنمية المجتمع.",
-              "17. By registering your child with Child Care Nurseries Group, you acknowledge and agree to all rules and terms in this form, which comply with SPEA (Sharjah Private Education Authority) and Ministry of Community Development requirements."
-            )}</p>
-          </div>
-          <button onClick={() => set("agree")(!f.agree)} className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-xl p-3">
-            <span className={`w-5 h-5 rounded border-2 flex items-center justify-center ${f.agree ? "bg-emerald-500 border-emerald-500" : "border-slate-300"}`}>
-              {f.agree && <Check className="w-3.5 h-3.5 text-white" />}
-            </span>
-            <span className="text-xs font-bold text-slate-700">{tr("أوافق على جميع الشروط والأحكام", "I agree to all terms & conditions")}</span>
-          </button>
-          <Field label={tr("اسم ولي الأمر", "Parent name")} value={f.sigName} onChange={setEv("sigName")} />
-          <Field label={tr("رقم الهوية الإماراتية", "Emirates ID number")} value={f.sigId} onChange={setEv("sigId")} />
-          <Field label={tr("التاريخ", "Date")} type="date" value={f.sigDate} onChange={setEv("sigDate")} />
-          <SignaturePad hasSignature={!!f.signatureDataUrl} onChange={(dataUrl) => set("signatureDataUrl")(dataUrl)} />
+        {step === 6 && (<>
+          <SectionCard emoji="📜" title={tr("الشروط والأحكام", "Terms & conditions")} color="amber">
+            <div className="max-h-56 overflow-y-auto bg-white rounded-2xl border border-amber-100 p-3 text-[11px] text-slate-600 leading-relaxed space-y-3">
+              {TERMS.map((sec, si) => (
+                <div key={si}>
+                  <p className="font-extrabold text-slate-700 mb-1">{tr(sec.title.ar, sec.title.en)}</p>
+                  {sec.items.map((it, ii) => (<p key={ii} className="mb-1.5">• {tr(it.ar, it.en)}</p>))}
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-400 text-center">{tr("↕ اسحبي لقراءة كل الشروط", "↕ Scroll to read all the terms")}</p>
+          </SectionCard>
+
+          <SectionCard emoji="✅" title={tr("الإقرارات", "Declarations")} color="emerald">
+            <button type="button" onClick={() => setF((s) => ({ ...s, consents: Object.fromEntries(CONSENTS.map((c) => [c.key, true])) }))}
+              className="w-full text-xs font-bold text-emerald-700 bg-white border border-emerald-200 rounded-2xl py-2">
+              {tr("✓ أوافق على كل الإقرارات (٦)", "✓ Accept all declarations (6)")}
+            </button>
+            {CONSENTS.map((c) => {
+              const on = !!f.consents?.[c.key];
+              return (
+                <button key={c.key} type="button" onClick={() => setConsent(c.key, !on)}
+                  className={`w-full flex items-start gap-2.5 text-right rounded-2xl border p-3 transition ${on ? "bg-white border-emerald-300" : "bg-white border-slate-200"}`}>
+                  <span className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${on ? "bg-emerald-500 border-emerald-500" : "border-slate-300"}`}>
+                    {on && <Check className="w-3.5 h-3.5 text-white" />}
+                  </span>
+                  <span className="text-[11.5px] leading-relaxed text-slate-700 flex-1">{tr(c.ar, c.en)}</span>
+                </button>
+              );
+            })}
+          </SectionCard>
+
+          <SectionCard emoji="📸" title={tr("تصوير الطفل ونشر الصور", "Photos of your child")} color="pink">
+            <p className="text-[11px] text-pink-700 text-right leading-relaxed">{tr("هل توافقين على تصوير طفلك ونشر صوره في أنشطة الحضانة ومنصاتها؟ (اختيارك لا يؤثر على قبول الطفل)", "Do you agree to photos/videos of your child being used in the nursery's activities and platforms? (Your choice does not affect admission.)")}</p>
+            <YesNo label={tr("موافقة الوسائط", "Media consent")} value={f.media} onChange={set("media")} />
+          </SectionCard>
+
+          <SectionCard emoji="✍️" title={tr("التوقيع", "Signature")} color="sky">
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setF((s) => ({ ...s, sigName: s.fName || s.sigName, sigId: s.fId || s.sigId }))} className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-white border border-sky-200 text-sky-700">{tr("أنا الأب", "I'm the father")}</button>
+              <button type="button" onClick={() => setF((s) => ({ ...s, sigName: s.mName || s.sigName, sigId: s.mId || s.sigId }))} className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-white border border-pink-200 text-pink-700">{tr("أنا الأم", "I'm the mother")}</button>
+            </div>
+            <Field req label={tr("اسم ولي الأمر الموقّع", "Signing parent's name")} value={f.sigName} onChange={setEv("sigName")} />
+            <Field req label={tr("رقم الهوية الإماراتية", "Emirates ID number")} value={f.sigId} onChange={setEv("sigId")} inputMode="numeric" />
+            <Field req label={tr("التاريخ", "Date")} type="date" value={f.sigDate} onChange={setEv("sigDate")} />
+            <SignaturePad hasSignature={!!f.signatureDataUrl} onChange={(dataUrl) => set("signatureDataUrl")(dataUrl)} />
+          </SectionCard>
         </>)}
       </div>
 
-      <div className="p-4 pt-2 flex flex-col gap-1.5">
+      <div className="p-4 pt-2 flex flex-col gap-1.5 bg-white border-t border-slate-100">
         {!stepValid() && (
-          <p className="text-[11px] text-rose-500 font-bold text-center">{tr("من فضلك املأي كل الحقول قبل المتابعة", "Please fill in all fields before continuing")}</p>
+          <p className="text-[11px] text-rose-500 font-bold text-center">{tr("املأي الخانات اللي عليها * علشان تكمّلي", "Please complete the fields marked * to continue")}</p>
         )}
         {step < steps.length - 1 ? (
           <button onClick={next} disabled={!stepValid()}
-            className={`w-full font-bold py-2.5 rounded-xl text-sm text-white ${stepValid() ? "bg-sky-500" : "bg-slate-300"}`}>
-            {tr("التالي", "Next")}
+            className={`w-full font-extrabold py-3 rounded-2xl text-sm text-white transition ${stepValid() ? "bg-gradient-to-l from-orange-500 to-amber-400 shadow-md" : "bg-slate-300"}`}>
+            {tr("التالي ←", "Next →")}
           </button>
         ) : (
           <button onClick={submit}
             disabled={!stepValid() || submitting || anyUploading}
-            className={`w-full font-bold py-2.5 rounded-xl text-sm text-white ${stepValid() && !submitting && !anyUploading ? "bg-emerald-500" : "bg-slate-300"}`}>
-            {submitting ? tr("جارِ الإرسال...", "Submitting...") : anyUploading ? tr("جارِ رفع الملفات...", "Uploading files...") : tr("إرسال الاستمارة", "Submit form")}
+            className={`w-full font-extrabold py-3 rounded-2xl text-sm text-white transition ${stepValid() && !submitting && !anyUploading ? "bg-gradient-to-l from-emerald-500 to-teal-400 shadow-md" : "bg-slate-300"}`}>
+            {submitting ? tr("جارِ الإرسال...", "Submitting...") : anyUploading ? tr("جارِ رفع الملفات...", "Uploading files...") : tr("إرسال الاستمارة 🎉", "Submit form 🎉")}
           </button>
         )}
       </div>

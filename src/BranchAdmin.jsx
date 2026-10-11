@@ -46,6 +46,8 @@ const KEY_LABELS = {
   meds: { ar: "أدوية؟", en: "Medication?" },
   medsDetail: { ar: "تفاصيل الأدوية", en: "Medication details" },
   doctor: { ar: "دكتور الطفل", en: "Child's doctor" },
+  special: { ar: "احتياجات خاصة؟", en: "Special needs?" },
+  specialDetail: { ar: "تفاصيل الاحتياجات", en: "Special needs details" },
   address: { ar: "العنوان", en: "Address" },
 };
 

@@ -20,6 +20,7 @@ const FIELD_LABELS: Record<string, string> = {
   loves: "أكثر شيء يحبه", fears: "أكثر شيء يخيفه",
   sleepHrs: "ساعات النوم", sleepAlone: "ينام بمفرده", foodLike: "أطعمة مفضلة", foodNo: "أطعمة ممنوعة",
   pacifier: "يستخدم لهاية/رضاعة", media: "موافقة الوسائط",
+  special: "احتياجات خاصة/متابعة علاجية", specialDetail: "تفاصيل الاحتياجات", termsVersion: "إصدار الشروط", consentedAt: "وقت الموافقة الإلكترونية",
   sigName: "اسم الموقّع", sigId: "رقم هوية الموقّع", sigDate: "تاريخ التوقيع",
 };
 
