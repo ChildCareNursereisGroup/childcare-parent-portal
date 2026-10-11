@@ -69,7 +69,12 @@ const BRANCHES = [
 // daily) changes the rate. Weekend days (Fri/Sat/Sun) are an ADD-ON on top
 // of the regular plan, not an alternative to it — no daily rate exists for
 // weekend days, only monthly/weekly.
-const ONE_TIME_FEES = { registration: 300, stationery: 200, uniform: 315 };
+// One-time items whose amounts the branch manager enters per child (not fixed in the form).
+const ONE_TIME_ITEMS = [
+  { key: "registration", ar: "رسوم التسجيل", en: "Registration" },
+  { key: "medical", ar: "رسوم الفحص الطبي", en: "Medical" },
+  { key: "uniform", ar: "رسوم الزي", en: "Uniform" },
+];
 const FREQUENCIES = [
   { key: "monthly", label: { ar: "شهري", en: "Monthly" } },
   { key: "weekly", label: { ar: "أسبوعي", en: "Weekly" } },
@@ -462,7 +467,7 @@ function Login({ onBack }) {
           <label className="text-xs font-bold text-slate-500 block mb-1" style={{ textAlign: lang === "ar" ? "right" : "left" }}>{tr("البريد الإلكتروني", "Email address")}</label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={tr("مثال: name@email.com", "e.g. name@email.com")}
             style={{ textAlign: lang === "ar" ? "right" : "left" }}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-sky-400" />
+            className="w-full border border-slate-200 bg-white text-slate-800 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-sky-400" />
           {error && <p className="text-xs text-rose-500 font-bold mb-3">{error}</p>}
           <button onClick={sendLink} disabled={loading} className="w-full bg-sky-500 text-white font-bold py-2.5 rounded-xl text-sm hover:bg-sky-600 transition disabled:opacity-60">
             {loading ? tr("جارِ الإرسال...", "Sending...") : tr("إرسال رابط الدخول", "Send login link")}
@@ -476,7 +481,7 @@ function Login({ onBack }) {
           <div className="border-t border-slate-100 pt-4">
             <p className="text-xs text-slate-400 mb-2">{tr("أو أدخلي الكود المكوّن من 6 أرقام من نفس الإيميل", "Or enter the 6-digit code from the same email")}</p>
             <input type="text" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-3 text-center tracking-[0.3em] font-bold focus:outline-none focus:ring-2 focus:ring-sky-400" />
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-3 text-center tracking-[0.3em] font-bold bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-400" />
             {error && <p className="text-xs text-rose-500 font-bold mb-3">{error}</p>}
             <button onClick={verifyCode} disabled={verifying} className="w-full bg-sky-500 text-white font-bold py-2.5 rounded-xl text-sm hover:bg-sky-600 transition disabled:opacity-60">
               {verifying ? tr("جارِ التحقق...", "Verifying...") : tr("تأكيد الكود", "Confirm code")}
@@ -807,40 +812,73 @@ function MonthlyEvalView({ registrationId }) {
 }
 
 // ---------------- Fees ----------------
-function FeesScreen({ showToast }) {
+function FeesScreen({ registrationId }) {
   const { tr } = useLang();
-  const history = [
-    { m: tr("يوليو 2026", "Jul 2026"), amount: "1,200", status: tr("مدفوع", "Paid"), date: "25/07" },
-    { m: tr("يونيو 2026", "Jun 2026"), amount: "1,200", status: tr("مدفوع", "Paid"), date: "24/06" },
-    { m: tr("مايو 2026", "May 2026"), amount: "1,200", status: tr("مدفوع", "Paid"), date: "26/05" },
+  const [reg, setReg] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!registrationId) { setLoading(false); return; }
+    supabase
+      .from("portal_registrations")
+      .select("branch, documents, fee_adjustments")
+      .eq("id", registrationId)
+      .single()
+      .then(({ data }) => { setReg(data); setLoading(false); });
+  }, [registrationId]);
+
+  if (loading) return <p className="text-xs text-slate-400 text-center pt-10">{tr("جارِ التحميل...", "Loading...")}</p>;
+  if (!reg) return <p className="text-xs text-slate-400 text-center pt-10 px-8">{tr("مفيش بيانات رسوم لسه.", "No fee details yet.")}</p>;
+
+  const billing = reg.documents?.billing || {};
+  const fa = reg.fee_adjustments;
+  const recurring = Number(billing.recurring_fee) || 0;
+  const freqAr = { monthly: "شهري", weekly: "أسبوعي", daily: "يومي" }[billing.frequency] || "";
+  const freqEn = billing.frequency || "";
+  const amt = (x) => (x === null || x === undefined ? null : Number(x));
+  const items = [
+    { ar: "رسوم التسجيل", en: "Registration", v: amt(fa?.registration_fee) },
+    { ar: "رسوم الفحص الطبي", en: "Medical", v: amt(fa?.medical_fee) },
+    { ar: "رسوم الزي", en: "Uniform", v: amt(fa?.uniform_fee) },
   ];
+  const oneTime = items.reduce((s, i) => s + (i.v || 0), 0);
+  const pctOff = Math.round((recurring * (Number(fa?.discount_percent) || 0)) / 100);
+  const amtOff = Number(fa?.discount_amount) || 0;
+  const total = Math.max(0, recurring - pctOff + oneTime - amtOff);
+  const branch = BRANCHES.find((b) => b.key === reg.branch);
+  const row = (label, value, cls = "") => (
+    <div className={`flex items-center justify-between text-xs py-2 border-b border-slate-50 last:border-0 ${cls}`}>
+      <span className="font-bold">{value}</span>
+      <span className="text-slate-500">{label}</span>
+    </div>
+  );
+
   return (
     <div className="px-4 py-4 space-y-3 overflow-y-auto h-full pb-4">
-      <div className="bg-gradient-to-br from-slate-800 to-slate-700 rounded-2xl p-5 text-white">
-        <p className="text-xs text-slate-300 mb-1">{tr("المستحق عن شهر أغسطس 2026", "Due for August 2026")}</p>
-        <p className="text-2xl font-extrabold mb-3">{tr("1,200 د.إ", "AED 1,200")}</p>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-300">{tr("تاريخ الاستحقاق", "Due date")}</span>
-          <span className="text-[11px] bg-amber-400/90 text-amber-900 font-bold px-2 py-1 rounded-full">{tr("مستحق يوم 27", "Due on the 27th")}</span>
-        </div>
+      <div className="bg-gradient-to-br from-sky-600 to-cyan-500 rounded-2xl p-5 text-white">
+        <p className="text-xs text-sky-100 mb-1">{fa ? tr("إجمالي المستحق للتسجيل", "Total due for registration") : tr("الرسوم الدورية", "Recurring fee")}</p>
+        <p className="text-2xl font-extrabold">{tr(`${fa ? total : recurring} د.إ`, `AED ${fa ? total : recurring}`)}</p>
+        {!fa && <p className="text-[11px] text-sky-100 mt-1">{tr("رسوم التسجيل والطبي والزي هتحدّدها الإدارة قريباً.", "Registration, medical and uniform fees will be set by management soon.")}</p>}
       </div>
-      <button onClick={() => showToast(tr("سيتم تفعيل الدفع الإلكتروني قريباً", "Online payment will be enabled soon"))}
-        className="w-full bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-sm">
-        {tr("ادفع الآن", "Pay now")}
-      </button>
+
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <p className="font-bold text-slate-800 text-sm mb-3">{tr("سجل المدفوعات", "Payment history")}</p>
-        <div className="space-y-2">
-          {history.map((h) => (
-            <div key={h.m} className="flex items-center justify-between text-xs border-b border-slate-50 pb-2 last:border-0">
-              <span className="text-slate-700 font-bold">{h.m}</span>
-              <span className="text-slate-600 font-bold">{tr(`${h.amount} د.إ`, `AED ${h.amount}`)}</span>
-              <span className="text-slate-400">{h.date}</span>
-              <span className="text-emerald-600 font-bold">{h.status}</span>
-            </div>
-          ))}
-        </div>
+        <p className="font-bold text-slate-800 text-sm mb-2">{tr("تفاصيل الرسوم", "Fee details")}</p>
+        {row(tr(`الرسوم الدورية (${freqAr})`, `Recurring fee (${freqEn})`), tr(`${recurring} د.إ`, `AED ${recurring}`))}
+        {items.map((i) => row(tr(i.ar, i.en), i.v === null ? tr("تحدّدها الإدارة", "Set by management") : tr(`${i.v} د.إ`, `AED ${i.v}`), i.v === null ? "text-amber-600" : ""))}
+        {pctOff > 0 && row(tr(`خصم ${fa.discount_percent}%`, `${fa.discount_percent}% discount`), tr(`− ${pctOff} د.إ`, `− AED ${pctOff}`), "text-emerald-600")}
+        {amtOff > 0 && row(tr("خصم", "Discount"), tr(`− ${amtOff} د.إ`, `− AED ${amtOff}`), "text-emerald-600")}
+        {fa?.offer_note && <p className="text-[11px] text-emerald-700 bg-emerald-50 rounded-lg px-2.5 py-1.5 mt-2 text-right">🎁 {fa.offer_note}</p>}
       </div>
+
+      {branch && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-[11px] text-emerald-700 leading-relaxed space-y-0.5">
+          <p className="font-bold text-xs">{tr("بيانات التحويل البنكي", "Bank transfer details")}</p>
+          <p>{branch.bank.holder}</p>
+          <p dir="ltr">IBAN: {branch.bank.iban}</p>
+          <p dir="ltr">BIC/SWIFT: {branch.bank.bic}</p>
+          <p>{branch.bank.bank}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -853,7 +891,8 @@ const STEP_META = [
   { emoji: "👨‍👩‍👧", img: "entrance.jpg", ar: "الوالدان", en: "Parents", hintAr: "بيانات للتواصل معاكم", hintEn: "How we can reach you" },
   { emoji: "🛡️", img: "graduation.jpg", ar: "الطوارئ والاستلام", en: "Safety & pickup", hintAr: "علشان طفلك دايماً في أمان", hintEn: "So your child is always safe" },
   { emoji: "🩺", img: "dance.jpg", ar: "صحة طفلك", en: "Health", hintAr: "نص الطريق خلص! كمّلي 🎉", hintEn: "Halfway there! 🎉" },
-  { emoji: "🗓️", img: "entrance.jpg", ar: "الخطة والرسوم", en: "Plan & fees", hintAr: "اختاري المواعيد المناسبة ليكي", hintEn: "Pick the schedule that suits you" },
+  { emoji: "🌈", img: "entrance.jpg", ar: "عن طفلك ومهاراته", en: "About & Skills", hintAr: "نفسنا نعرف شخصيته الحلوة 🌈", hintEn: "Tell us about their personality 🌈" },
+  { emoji: "🗓️", img: "dance.jpg", ar: "الخطة والرسوم", en: "Plan & fees", hintAr: "اختاري المواعيد المناسبة ليكي", hintEn: "Pick the schedule that suits you" },
   { emoji: "📎", img: "graduation.jpg", ar: "المستندات", en: "Documents", hintAr: "صور واضحة من الموبايل كفاية", hintEn: "Clear phone photos are enough" },
   { emoji: "✍️", img: "dance.jpg", ar: "الموافقات والتوقيع", en: "Consent & signature", hintAr: "آخر خطوة — يلا بينا! 🎈", hintEn: "Last step — almost done! 🎈" },
 ];
@@ -952,7 +991,8 @@ function RegisterForm({ onBack, showToast, standalone }) {
   const meta = STEP_META[step];
 
   const yesNoDetailOk = (val, detail) => !!val && (val === "no" || !!detail);
-  const parentOk = (p) => !!(f[`${p}Name`] && f[`${p}Id`] && f[`${p}Mobile`] && f[`${p}Email`]);
+  const emailOk = (e) => /^\S+@\S+\.\S+$/.test((e || "").trim());
+  const parentOk = (p) => !!(f[`${p}Name`] && f[`${p}Id`] && f[`${p}Mobile`] && emailOk(f[`${p}Email`]));
 
   const stepValid = () => {
     switch (step) {
@@ -969,12 +1009,15 @@ function RegisterForm({ onBack, showToast, standalone }) {
           yesNoDetailOk(f.special, f.specialDetail) &&
           !!(f.blood && f.vax);
       case 4:
-        return !!(f.plan && f.transportPlan);
+        return !!(f.order && f.hobbies && f.colors && f.personality && f.loves && f.fears &&
+          (f.skillsNone || Object.values(f.skills || {}).some(Boolean)));
       case 5:
+        return !!(f.plan && f.transportPlan);
+      case 6:
         return files.fatherId?.status === "done" && files.motherId?.status === "done" &&
           files.childPhoto?.status === "done" &&
           (files.vaxCard?.status === "done" || !!f.vaxPledge);
-      case 6:
+      case 7:
         return CONSENTS.every((c) => f.consents?.[c.key]) && !!f.media &&
           !!(f.sigName && f.sigId && f.sigDate && f.signatureDataUrl);
       default:
@@ -1000,7 +1043,6 @@ function RegisterForm({ onBack, showToast, standalone }) {
     const selectedWeekendDays = WEEKEND_DAYS.filter((d) => (f.weekendDays || {})[d.key]);
     const weekendFee = freq === "daily" ? 0 : selectedWeekendDays.reduce((sum, d) => sum + (d[freq] || 0), 0);
     const recurringFee = (selectedPlan?.[freq] || 0) + (selectedTransport?.[freq] || 0) + weekendFee;
-    const oneTimeFee = ONE_TIME_FEES.registration + ONE_TIME_FEES.stationery + ONE_TIME_FEES.uniform;
 
     let signaturePath = null;
     if (f.signatureDataUrl) {
@@ -1015,7 +1057,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
       const pdfBlob = await generateFormPdfBlob({
         f: formData,
         branchLabel: selectedBranch ? selectedBranch.name.ar : f.branch,
-        billing: { recurring_fee: recurringFee, one_time_fee: oneTimeFee },
+        billing: { recurring_fee: recurringFee, one_time_fee: null },
         signatureDataUrl: f.signatureDataUrl || null,
       });
       const pdfPath = `${regId}/full-form-${Date.now()}.pdf`;
@@ -1046,7 +1088,9 @@ function RegisterForm({ onBack, showToast, standalone }) {
           transport_key: selectedTransport?.key || null,
           weekend_days: selectedWeekendDays.map((d) => d.key),
           recurring_fee: recurringFee,
-          one_time_fee: oneTimeFee,
+          one_time_fee: null,
+          one_time_items: ONE_TIME_ITEMS.map((i) => i.key),
+          promo_code: f.promoCode || null,
         },
       },
     });
@@ -1192,18 +1236,44 @@ function RegisterForm({ onBack, showToast, standalone }) {
             <YesNo label={tr("التطعيمات مكتملة؟", "Vaccinations up to date?")} value={f.vax} onChange={set("vax")} />
             <Select req label={tr("فصيلة الدم", "Blood type")} options={BLOOD} value={f.blood} onChange={set("blood")} />
           </SectionCard>
-          <Collapse title={tr("عن طفلك — اختياري (بيساعدنا نفهمه أكتر)", "About your child — optional (helps us know them)")}>
+        </>)}
+
+        {step === 4 && (<>
+          <SectionCard emoji="🌈" title={tr("شخصية طفلك واهتماماته", "Personality & interests")} color="pink">
+            <Select req label={tr("ترتيبه بين إخوته", "Birth order")} options={["only|الوحيد", "first|الأكبر", "middle|الأوسط", "last|الأصغر"]} value={f.order} onChange={set("order")} />
+            <Select req label={tr("شخصية الطفل", "Personality")} options={PERSONALITY} value={f.personality} onChange={set("personality")} />
+            <Field req label={tr("هواياته / ألعابه المفضلة", "Favorite hobbies / toys")} value={f.hobbies} onChange={setEv("hobbies")} />
+            <Field req label={tr("ألوانه المفضلة", "Favorite colors")} value={f.colors} onChange={setEv("colors")} />
+            <Field req label={tr("أكتر حاجة بيحبها", "What they love most")} value={f.loves} onChange={setEv("loves")} />
+            <Field req label={tr("أكتر حاجة بتخوّفه", "What scares them most")} value={f.fears} onChange={setEv("fears")} />
+          </SectionCard>
+          <SectionCard emoji="⭐" title={tr("مهارات الطفل (اختاري كل اللي ينطبق) *", "Child's skills (tick all that apply) *")} color="amber">
+            {SKILLS.map((sk) => {
+              const { en, ar } = split(sk);
+              const on = !!(f.skills || {})[en];
+              return (
+                <button key={en} type="button" onClick={() => setF((s) => ({ ...s, skillsNone: false, skills: { ...(s.skills || {}), [en]: !on } }))}
+                  className={`w-full flex items-center gap-2.5 text-right rounded-2xl border p-2.5 ${on ? "bg-white border-amber-400" : "bg-white border-slate-200"}`}>
+                  <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${on ? "bg-amber-500 border-amber-500" : "border-slate-300"}`}>{on && <Check className="w-3.5 h-3.5 text-white" />}</span>
+                  <span className="text-xs font-bold text-slate-700 flex-1">{tr(ar, en)}</span>
+                </button>
+              );
+            })}
+            <button type="button" onClick={() => setF((s) => ({ ...s, skills: {}, skillsNone: !s.skillsNone }))}
+              className={`w-full flex items-center gap-2.5 text-right rounded-2xl border p-2.5 ${f.skillsNone ? "bg-white border-slate-500" : "bg-white border-slate-200"}`}>
+              <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${f.skillsNone ? "bg-slate-600 border-slate-600" : "border-slate-300"}`}>{f.skillsNone && <Check className="w-3.5 h-3.5 text-white" />}</span>
+              <span className="text-xs font-bold text-slate-500 flex-1">{tr("لسه مفيش مهارات من دي", "None of these yet")}</span>
+            </button>
+          </SectionCard>
+          <Collapse title={tr("عادات يومية (اختياري)", "Daily habits (optional)")}>
             <Field label={tr("أطعمة لا يتناولها (لأي سبب)", "Foods not allowed (any reason)")} value={f.foodNo} onChange={setEv("foodNo")} />
             <Field label={tr("أطعمة مفضلة", "Favorite foods")} value={f.foodLike} onChange={setEv("foodLike")} />
-            <Field label={tr("هواياته / ألعابه المفضلة", "Favorite hobbies / toys")} value={f.hobbies} onChange={setEv("hobbies")} />
-            <Field label={tr("أكثر شيء يخيفه", "What scares them most")} value={f.fears} onChange={setEv("fears")} />
-            <Select label={tr("شخصية الطفل", "Personality")} options={PERSONALITY} value={f.personality} onChange={set("personality")} />
             <YesNo label={tr("ينام بمفرده؟", "Sleeps alone?")} value={f.sleepAlone} onChange={set("sleepAlone")} />
             <YesNo label={tr("يستخدم لهاية/رضّاعة؟", "Uses pacifier/bottle?")} value={f.pacifier} onChange={set("pacifier")} />
           </Collapse>
         </>)}
 
-        {step === 4 && (<>
+        {step === 5 && (<>
           <p className="text-xs font-bold text-slate-500">{tr("طريقة الدفع", "Payment frequency")}</p>
           <div className="flex gap-1.5 justify-end">
             {FREQUENCIES.map((fr) => (
@@ -1292,7 +1362,6 @@ function RegisterForm({ onBack, showToast, standalone }) {
             const transport = TRANSPORT_OPTIONS.find((t) => t.key === f.transportPlan);
             const weekendTotal = WEEKEND_DAYS.reduce((sum, d) => sum + ((f.weekendDays || {})[d.key] ? d[freq] || 0 : 0), 0);
             const recurringTotal = (plan?.[freq] || 0) + (transport?.[freq] || 0) + weekendTotal;
-            const oneTimeTotal = ONE_TIME_FEES.registration + ONE_TIME_FEES.stationery + ONE_TIME_FEES.uniform;
             const freqLabel = FREQUENCIES.find((fr) => fr.key === freq);
             const branch = BRANCHES.find((b) => b.name.en === f.branch);
             return (
@@ -1303,9 +1372,14 @@ function RegisterForm({ onBack, showToast, standalone }) {
                     <span className="text-slate-300">{tr(`الرسوم المتوقعة (${tr(freqLabel.label.ar, freqLabel.label.en)})`, `Estimated fees (${freqLabel.label.en})`)}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold">{tr(`${oneTimeTotal} د.إ`, `AED ${oneTimeTotal}`)}</span>
-                    <span className="text-slate-300">{tr("رسوم لمرة واحدة (تسجيل + قرطاسية + زي)", "One-time fees (registration + stationery + uniform)")}</span>
+                    <span className="font-bold text-amber-300">{tr("تحدّدها الإدارة", "Set by management")}</span>
+                    <span className="text-slate-300">{tr("رسوم لمرة واحدة (التسجيل + الطبي + الزي)", "One-time fees (registration + medical + uniform)")}</span>
                   </div>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 space-y-2">
+                  <p className="text-xs font-bold text-amber-800 text-right">{tr("🎁 عندك كود خصم أو عرض؟ (اختياري)", "🎁 Have a discount code or offer? (optional)")}</p>
+                  <Field label="" value={f.promoCode} onChange={setEv("promoCode")} />
+                  <p className="text-[10.5px] text-amber-700 text-right">{tr("الإدارة هتراجع الكود وتطبّق الخصم على رسومك.", "Management will review the code and apply the discount to your fees.")}</p>
                 </div>
                 {branch && (
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-emerald-700 leading-relaxed space-y-0.5">
@@ -1321,7 +1395,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
           })()}
         </>)}
 
-        {step === 5 && (<>
+        {step === 6 && (<>
           <p className="text-xs text-slate-400">{tr("ارفعي صور واضحة للمستندات التالية (JPG, PNG أو PDF)", "Upload clear photos of the following documents (JPG, PNG, or PDF)")}</p>
           <FileUploadRow label={tr("صورة هوية الأب", "Father's ID copy")} status={files.fatherId?.status} fileName={files.fatherId?.name} error={files.fatherId?.error} onSelect={(file) => uploadFile("fatherId", file)} />
           <FileUploadRow label={tr("صورة هوية الأم", "Mother's ID copy")} status={files.motherId?.status} fileName={files.motherId?.name} error={files.motherId?.error} onSelect={(file) => uploadFile("motherId", file)} />
@@ -1337,7 +1411,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
           </button>
         </>)}
 
-        {step === 6 && (<>
+        {step === 7 && (<>
           <SectionCard emoji="📜" title={tr("الشروط والأحكام", "Terms & conditions")} color="amber">
             <div className="max-h-56 overflow-y-auto bg-white rounded-2xl border border-amber-100 p-3 text-[11px] text-slate-600 leading-relaxed space-y-3">
               {TERMS.map((sec, si) => (
@@ -1814,7 +1888,7 @@ export default function ParentPortalPrototype() {
                 {activeTab === "home" && <HomeScreen setActiveTab={setActiveTab} setMoreView={setMoreView} goBranch={() => { setActiveTab("more"); setMoreView("branch"); }} />}
                 {activeTab === "schedule" && <ScheduleScreen showToast={showToast} />}
                 {activeTab === "reports" && <ReportsScreen registrationId={myRegistrationId} />}
-                {activeTab === "fees" && <FeesScreen showToast={showToast} />}
+                {activeTab === "fees" && <FeesScreen registrationId={myRegistrationId} />}
                 {activeTab === "more" && !moreView && <MoreMenu setMoreView={setMoreView} />}
                 {activeTab === "more" && moreView === "register" && <RegisterForm onBack={() => setMoreView(null)} showToast={showToast} />}
                 {activeTab === "more" && moreView && moreView !== "register" && (

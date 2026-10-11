@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
 
       const { data: regs, error: regErr } = await admin
         .from("portal_registrations")
-        .select("id, status, form_data, documents, contact_email, class_id, created_at")
+        .select("id, status, form_data, documents, contact_email, class_id, created_at, fee_adjustments")
         .eq("branch", branch)
         .order("created_at", { ascending: false });
       if (regErr) return json({ error: regErr.message }, 500);
@@ -289,6 +289,30 @@ Deno.serve(async (req) => {
         .limit(30);
       if (error) return json({ error: error.message }, 500);
       return json({ reports: data || [] });
+    }
+
+    if (action === "save_fees") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      const { registration_id, fees } = body;
+      const num = (v: unknown) => (v === "" || v === null || v === undefined || isNaN(Number(v)) || Number(v) < 0 ? null : Number(v));
+      const pct = num(fees?.discount_percent);
+      const clean = {
+        registration_fee: num(fees?.registration_fee),
+        medical_fee: num(fees?.medical_fee),
+        uniform_fee: num(fees?.uniform_fee),
+        discount_amount: num(fees?.discount_amount),
+        discount_percent: pct !== null && pct <= 100 ? pct : null,
+        offer_note: fees?.offer_note ? String(fees.offer_note).slice(0, 300) : null,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await admin
+        .from("portal_registrations")
+        .update({ fee_adjustments: clean })
+        .eq("id", registration_id)
+        .eq("branch", branch);
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true, fee_adjustments: clean });
     }
 
     if (action === "save_evaluation") {

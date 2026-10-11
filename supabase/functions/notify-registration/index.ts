@@ -70,12 +70,14 @@ async function fetchAttachment(admin: ReturnType<typeof createClient>, path: str
   return { filename, content: base64 };
 }
 
+let lastResendError = "";
 async function sendEmail(resendKey: string, to: string, subject: string, html: string, attachments: any[]) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ from: "مجموعة رعاية الطفل للحضانات <login@childcareuae.com>", to, subject, html, attachments }),
   });
+  if (!res.ok) { lastResendError += `[${to}: ${res.status} ${await res.text()}] `; console.error("resend error", lastResendError); }
   return res.ok;
 }
 
@@ -95,7 +97,9 @@ Deno.serve(async (req) => {
     const email = record.contact_email || "-";
     const billing = record.documents?.billing;
     const freqAr = billing ? ({ monthly: "شهري", weekly: "أسبوعي", daily: "يومي" } as Record<string, string>)[billing.frequency] || billing.frequency : "";
-    const fee = billing ? `${billing.recurring_fee} د.إ (${freqAr}) + ${billing.one_time_fee} د.إ رسوم لمرة واحدة` : "-";
+    const oneTime = billing?.one_time_fee ? `${billing.one_time_fee} د.إ رسوم لمرة واحدة` : "رسوم التسجيل والطبي والزي (تحدّدها الإدارة)";
+    const promo = billing?.promo_code ? ` — كود الخصم: ${billing.promo_code}` : "";
+    const fee = billing ? `${billing.recurring_fee} د.إ (${freqAr}) + ${oneTime}${promo}` : "-";
 
     const docs = record.documents || {};
     const [fullFormAttachment, signatureAttachment, fatherIdAttachment, motherIdAttachment, childIdAttachment, childPhotoAttachment, vaxCardAttachment] = await Promise.all([
@@ -134,7 +138,7 @@ Deno.serve(async (req) => {
       parentSent = await sendEmail(resendKey, record.contact_email, "نسخة من استمارة تسجيل طفلك", html, attachments);
     }
 
-    return new Response(JSON.stringify({ ok: true, admin_sent: adminSent, parent_sent: parentSent }), {
+    return new Response(JSON.stringify({ ok: true, admin_sent: adminSent, parent_sent: parentSent, error: lastResendError || undefined }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (e) {

@@ -302,6 +302,76 @@ function MonthlyEvalSection({ tr, lang, reg, token, showToast }) {
   );
 }
 
+function FeesSection({ tr, reg, token, showToast, onChanged }) {
+  const billing = reg.documents?.billing || {};
+  const fa = reg.fee_adjustments || {};
+  const init = () => ({
+    registration_fee: fa.registration_fee ?? "",
+    medical_fee: fa.medical_fee ?? "",
+    uniform_fee: fa.uniform_fee ?? "",
+    discount_amount: fa.discount_amount ?? "",
+    discount_percent: fa.discount_percent ?? "",
+    offer_note: fa.offer_note || "",
+  });
+  const [v, setV] = useState(init);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setV(init()); }, [reg.id, reg.fee_adjustments]);
+
+  const n = (x) => (x === "" || x === null || x === undefined || isNaN(Number(x)) ? 0 : Number(x));
+  const recurring = Number(billing.recurring_fee) || 0;
+  const oneTime = n(v.registration_fee) + n(v.medical_fee) + n(v.uniform_fee);
+  const pctOff = Math.round((recurring * n(v.discount_percent)) / 100);
+  const total = Math.max(0, recurring - pctOff + oneTime - n(v.discount_amount));
+  const promo = billing.promo_code || reg.form_data?.promoCode;
+  const set = (k) => (e) => setV((s) => ({ ...s, [k]: e.target.value }));
+
+  const save = async () => {
+    setSaving(true);
+    const { data, error } = await supabase.functions.invoke("branch-admin", { body: { action: "save_fees", token, registration_id: reg.id, fees: v } });
+    setSaving(false);
+    if (error || data?.error) { showToast(tr("حصل خطأ في حفظ الرسوم", "Failed to save fees")); return; }
+    showToast(tr("تم حفظ الرسوم والخصم", "Fees & discount saved"));
+    onChanged();
+  };
+
+  const numInput = (k, label) => (
+    <div>
+      <label className="text-[11px] text-slate-400 block mb-1">{label}</label>
+      <input type="number" min="0" inputMode="decimal" value={v[k]} onChange={set(k)} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs bg-white text-slate-800" />
+    </div>
+  );
+
+  return (
+    <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100">
+      <p className="text-xs font-bold text-amber-800 mb-2">{tr("💰 الرسوم والخصومات", "💰 Fees & discounts")}</p>
+      {promo && (
+        <p className="text-[11px] bg-white border border-amber-200 rounded-xl px-2.5 py-1.5 mb-2 text-amber-800">
+          {tr("كود الخصم اللي كتبه ولي الأمر: ", "Parent's discount code: ")}<b dir="ltr">{promo}</b>
+        </p>
+      )}
+      <p className="text-[11px] text-slate-500 mb-2">{tr(`الرسوم الدورية (من الاستمارة): ${recurring} د.إ`, `Recurring fee (from form): AED ${recurring}`)}</p>
+      <div className="grid grid-cols-3 gap-1.5 mb-2">
+        {numInput("registration_fee", tr("التسجيل", "Registration"))}
+        {numInput("medical_fee", tr("الطبي", "Medical"))}
+        {numInput("uniform_fee", tr("الزي", "Uniform"))}
+      </div>
+      <div className="grid grid-cols-2 gap-1.5 mb-2">
+        {numInput("discount_amount", tr("خصم (درهم)", "Discount (AED)"))}
+        {numInput("discount_percent", tr("خصم (% من الدورية)", "Discount (% of recurring)"))}
+      </div>
+      <input value={v.offer_note} onChange={set("offer_note")} placeholder={tr("اسم العرض / ملاحظة (مثال: خصم الإخوة)", "Offer name / note (e.g. sibling discount)")}
+        className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mb-2 bg-white text-slate-800" />
+      <div className="flex items-center justify-between bg-white rounded-xl border border-amber-200 px-3 py-2 mb-2">
+        <span className="text-sm font-extrabold text-slate-800">{total} {tr("د.إ", "AED")}</span>
+        <span className="text-[11px] text-slate-500">{tr("الإجمالي المستحق (الدورية + التسجيل/الطبي/الزي − الخصم)", "Total due (recurring + one-time − discount)")}</span>
+      </div>
+      <button onClick={save} disabled={saving} className="w-full bg-amber-500 text-white font-bold py-2 rounded-xl text-xs disabled:opacity-60">
+        {saving ? tr("جارِ الحفظ...", "Saving...") : tr("حفظ الرسوم والخصم", "Save fees & discount")}
+      </button>
+    </div>
+  );
+}
+
 function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast }) {
   const f = reg.form_data || {};
   const lang = tr("ar", "en") === "ar" ? "ar" : "en";
@@ -494,6 +564,8 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
             })}
           </div>
         </div>
+
+        <FeesSection tr={tr} reg={reg} token={token} showToast={showToast} onChanged={onChanged} />
 
         <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
           <p className="text-xs font-bold text-slate-500 mb-2">{tr("الفصل", "Class")}</p>

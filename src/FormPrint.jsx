@@ -111,7 +111,7 @@ export default function FormPrintView({ f, branchLabel, billing, signatureDataUr
       </Section>
 
       <Section title="٧. عن الطفل ومهاراته">
-        <Row label="ترتيبه بين إخوته" value={{ first: "الأكبر", middle: "الأوسط", last: "الأصغر" }[f.order] || f.order} />
+        <Row label="ترتيبه بين إخوته" value={{ only: "الوحيد", first: "الأكبر", middle: "الأوسط", last: "الأصغر" }[f.order] || f.order} />
         <Row label="الهوايات / الألعاب المفضلة" value={f.hobbies} />
         <Row label="الألوان المفضلة" value={f.colors} />
         <Row label="شخصية الطفل" value={f.personality} />
@@ -132,7 +132,8 @@ export default function FormPrintView({ f, branchLabel, billing, signatureDataUr
       <Section title="٩. الخطة والرسوم">
         <Row label="طريقة الدفع" value={freqAr} />
         <Row label="الرسوم الدورية" value={billing ? `${billing.recurring_fee} د.إ` : "-"} />
-        <Row label="الرسوم لمرة واحدة" value={billing ? `${billing.one_time_fee} د.إ` : "-"} />
+        <Row label="الرسوم لمرة واحدة (التسجيل + الطبي + الزي)" value={billing?.one_time_fee ? `${billing.one_time_fee} د.إ` : "تحدّدها الإدارة"} />
+        <Row label="كود الخصم / العرض" value={f.promoCode} />
       </Section>
 
       <Section title="١٠. المستندات المرفقة">
