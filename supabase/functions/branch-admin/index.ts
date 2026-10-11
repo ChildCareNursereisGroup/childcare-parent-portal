@@ -300,6 +300,7 @@ Deno.serve(async (req) => {
       const clean = {
         registration_fee: num(fees?.registration_fee),
         medical_fee: num(fees?.medical_fee),
+        stationery_fee: num(fees?.stationery_fee),
         uniform_fee: num(fees?.uniform_fee),
         discount_amount: num(fees?.discount_amount),
         discount_percent: pct !== null && pct <= 100 ? pct : null,

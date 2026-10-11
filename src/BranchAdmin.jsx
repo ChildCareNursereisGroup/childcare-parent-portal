@@ -308,6 +308,7 @@ function FeesSection({ tr, reg, token, showToast, onChanged }) {
   const init = () => ({
     registration_fee: fa.registration_fee ?? "",
     medical_fee: fa.medical_fee ?? "",
+    stationery_fee: fa.stationery_fee ?? "",
     uniform_fee: fa.uniform_fee ?? "",
     discount_amount: fa.discount_amount ?? "",
     discount_percent: fa.discount_percent ?? "",
@@ -319,7 +320,7 @@ function FeesSection({ tr, reg, token, showToast, onChanged }) {
 
   const n = (x) => (x === "" || x === null || x === undefined || isNaN(Number(x)) ? 0 : Number(x));
   const recurring = Number(billing.recurring_fee) || 0;
-  const oneTime = n(v.registration_fee) + n(v.medical_fee) + n(v.uniform_fee);
+  const oneTime = n(v.registration_fee) + n(v.medical_fee) + n(v.stationery_fee) + n(v.uniform_fee);
   const pctOff = Math.round((recurring * n(v.discount_percent)) / 100);
   const total = Math.max(0, recurring - pctOff + oneTime - n(v.discount_amount));
   const promo = billing.promo_code || reg.form_data?.promoCode;
@@ -350,9 +351,10 @@ function FeesSection({ tr, reg, token, showToast, onChanged }) {
         </p>
       )}
       <p className="text-[11px] text-slate-500 mb-2">{tr(`الرسوم الدورية (من الاستمارة): ${recurring} د.إ`, `Recurring fee (from form): AED ${recurring}`)}</p>
-      <div className="grid grid-cols-3 gap-1.5 mb-2">
+      <div className="grid grid-cols-2 gap-1.5 mb-2">
         {numInput("registration_fee", tr("التسجيل", "Registration"))}
         {numInput("medical_fee", tr("الطبي", "Medical"))}
+        {numInput("stationery_fee", tr("القرطاسية", "Stationery"))}
         {numInput("uniform_fee", tr("الزي", "Uniform"))}
       </div>
       <div className="grid grid-cols-2 gap-1.5 mb-2">
@@ -363,7 +365,7 @@ function FeesSection({ tr, reg, token, showToast, onChanged }) {
         className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mb-2 bg-white text-slate-800" />
       <div className="flex items-center justify-between bg-white rounded-xl border border-amber-200 px-3 py-2 mb-2">
         <span className="text-sm font-extrabold text-slate-800">{total} {tr("د.إ", "AED")}</span>
-        <span className="text-[11px] text-slate-500">{tr("الإجمالي المستحق (الدورية + التسجيل/الطبي/الزي − الخصم)", "Total due (recurring + one-time − discount)")}</span>
+        <span className="text-[11px] text-slate-500">{tr("الإجمالي المستحق (الدورية + التسجيل/الطبي/القرطاسية/الزي − الخصم)", "Total due (recurring + one-time − discount)")}</span>
       </div>
       <button onClick={save} disabled={saving} className="w-full bg-amber-500 text-white font-bold py-2 rounded-xl text-xs disabled:opacity-60">
         {saving ? tr("جارِ الحفظ...", "Saving...") : tr("حفظ الرسوم والخصم", "Save fees & discount")}

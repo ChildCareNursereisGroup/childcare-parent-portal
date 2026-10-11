@@ -73,6 +73,7 @@ const BRANCHES = [
 const ONE_TIME_ITEMS = [
   { key: "registration", ar: "رسوم التسجيل", en: "Registration" },
   { key: "medical", ar: "رسوم الفحص الطبي", en: "Medical" },
+  { key: "stationery", ar: "رسوم القرطاسية", en: "Stationery" },
   { key: "uniform", ar: "رسوم الزي", en: "Uniform" },
 ];
 const FREQUENCIES = [
@@ -839,6 +840,7 @@ function FeesScreen({ registrationId }) {
   const items = [
     { ar: "رسوم التسجيل", en: "Registration", v: amt(fa?.registration_fee) },
     { ar: "رسوم الفحص الطبي", en: "Medical", v: amt(fa?.medical_fee) },
+    { ar: "رسوم القرطاسية", en: "Stationery", v: amt(fa?.stationery_fee) },
     { ar: "رسوم الزي", en: "Uniform", v: amt(fa?.uniform_fee) },
   ];
   const oneTime = items.reduce((s, i) => s + (i.v || 0), 0);
@@ -858,7 +860,7 @@ function FeesScreen({ registrationId }) {
       <div className="bg-gradient-to-br from-sky-600 to-cyan-500 rounded-2xl p-5 text-white">
         <p className="text-xs text-sky-100 mb-1">{fa ? tr("إجمالي المستحق للتسجيل", "Total due for registration") : tr("الرسوم الدورية", "Recurring fee")}</p>
         <p className="text-2xl font-extrabold">{tr(`${fa ? total : recurring} د.إ`, `AED ${fa ? total : recurring}`)}</p>
-        {!fa && <p className="text-[11px] text-sky-100 mt-1">{tr("رسوم التسجيل والطبي والزي هتحدّدها الإدارة قريباً.", "Registration, medical and uniform fees will be set by management soon.")}</p>}
+        {!fa && <p className="text-[11px] text-sky-100 mt-1">{tr("رسوم التسجيل والطبي والقرطاسية والزي هتحدّدها الإدارة قريباً.", "Registration, medical, stationery and uniform fees will be set by management soon.")}</p>}
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
@@ -1373,7 +1375,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-amber-300">{tr("تحدّدها الإدارة", "Set by management")}</span>
-                    <span className="text-slate-300">{tr("رسوم لمرة واحدة (التسجيل + الطبي + الزي)", "One-time fees (registration + medical + uniform)")}</span>
+                    <span className="text-slate-300">{tr("رسوم لمرة واحدة (التسجيل + الطبي + القرطاسية + الزي)", "One-time fees (registration + medical + stationery + uniform)")}</span>
                   </div>
                 </div>
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 space-y-2">

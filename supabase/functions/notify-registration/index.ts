@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
     const email = record.contact_email || "-";
     const billing = record.documents?.billing;
     const freqAr = billing ? ({ monthly: "شهري", weekly: "أسبوعي", daily: "يومي" } as Record<string, string>)[billing.frequency] || billing.frequency : "";
-    const oneTime = billing?.one_time_fee ? `${billing.one_time_fee} د.إ رسوم لمرة واحدة` : "رسوم التسجيل والطبي والزي (تحدّدها الإدارة)";
+    const oneTime = billing?.one_time_fee ? `${billing.one_time_fee} د.إ رسوم لمرة واحدة` : "رسوم التسجيل والطبي والقرطاسية والزي (تحدّدها الإدارة)";
     const promo = billing?.promo_code ? ` — كود الخصم: ${billing.promo_code}` : "";
     const fee = billing ? `${billing.recurring_fee} د.إ (${freqAr}) + ${oneTime}${promo}` : "-";
 
