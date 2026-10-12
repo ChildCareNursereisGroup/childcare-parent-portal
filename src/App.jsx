@@ -978,9 +978,22 @@ function RegisterForm({ onBack, showToast, standalone }) {
     try {
       const pdfBlob = await generateFormPdfBlob({
         f: formData,
-        branchLabel: selectedBranch ? selectedBranch.name.ar : f.branch,
-        billing: { recurring_fee: recurringFee, one_time_fee: null },
+        branch: selectedBranch || null,
+        billing: {
+          recurring_fee: recurringFee,
+          one_time_fee: null,
+          planLabel: selectedPlan?.label.ar || "",
+          transportLabel: selectedTransport?.label.ar || "",
+          weekendLabels: selectedWeekendDays.map((d) => d.label.ar),
+        },
         signatureDataUrl: f.signatureDataUrl || null,
+        attached: [
+          files.fatherId?.status === "done" && "هوية الأب",
+          files.motherId?.status === "done" && "هوية الأم",
+          files.childId?.status === "done" && "هوية/شهادة ميلاد الطفل",
+          files.childPhoto?.status === "done" && "صورة الطفل",
+          files.vaxCard?.status === "done" ? "كارت التطعيمات" : f.vaxPledge ? "تعهد بتقديم كارت التطعيمات لاحقاً" : false,
+        ].filter(Boolean),
       });
       const pdfPath = `${regId}/full-form-${Date.now()}.pdf`;
       const { error: pdfErr } = await supabase.storage.from("registration-documents").upload(pdfPath, pdfBlob, { contentType: "application/pdf" });
