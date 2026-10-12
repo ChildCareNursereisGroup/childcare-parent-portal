@@ -268,6 +268,12 @@ Deno.serve(async (req) => {
 
       const docs = reg.documents || {};
       const paths = DOC_KEYS.map((k) => docs[k]).filter((p): p is string => typeof p === "string" && p.length > 0);
+      // Also remove anything else stored under this child (e.g. emailed monthly report PDFs).
+      const { data: listed } = await admin.storage.from("registration-documents").list(String(registration_id));
+      for (const o of listed || []) {
+        const full = `${registration_id}/${o.name}`;
+        if (!paths.includes(full)) paths.push(full);
+      }
       if (paths.length) {
         await admin.storage.from("registration-documents").remove(paths);
       }
@@ -353,6 +359,99 @@ Deno.serve(async (req) => {
       );
       if (error) return json({ error: error.message }, 500);
       return json({ ok: true });
+    }
+
+    if (action === "send_evaluation") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      const { registration_id, month, report, pdf_path } = body;
+      if (!registration_id || !month || !report?.domains) return json({ error: "بيانات ناقصة" }, 400);
+
+      const { data: reg, error: regErr } = await admin
+        .from("portal_registrations")
+        .select("id, contact_email, form_data")
+        .eq("id", registration_id)
+        .eq("branch", branch)
+        .single();
+      if (regErr || !reg) return json({ error: "الطفل غير موجود" }, 404);
+
+      const emailRe = /^\S+@\S+\.\S+$/;
+      const recipients = [...new Set(
+        [reg.form_data?.fEmail, reg.form_data?.mEmail, reg.contact_email]
+          .map((e) => String(e || "").trim().toLowerCase())
+          .filter((e) => emailRe.test(e))
+      )];
+      if (recipients.length === 0) return json({ error: "مفيش إيميل صحيح لولي الأمر" }, 400);
+
+      const esc = (v: unknown) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] || c));
+
+      let attachments: { filename: string; content: string }[] = [];
+      if (typeof pdf_path === "string" && pdf_path.startsWith(`${registration_id}/`)) {
+        const { data: file } = await admin.storage.from("registration-documents").download(pdf_path);
+        if (file) {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          let bin = "";
+          for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+          attachments = [{ filename: `تقرير-نمو-${month}.pdf`, content: btoa(bin) }];
+        }
+      }
+
+      const domainsHtml = (report.domains as any[]).map((d) => {
+        const stars = "★".repeat(d.avg || 0) + `<span style="color:#e2e8f0">${"★".repeat(5 - (d.avg || 0))}</span>`;
+        const items = (d.items as any[]).map((it) => `
+          <div style="border-right:4px solid ${esc(it.color)};background:#f8fafc;border-radius:8px;padding:8px 12px;margin:6px 0;">
+            <div style="font-size:12px;font-weight:bold;color:${esc(it.color)};">${esc(it.skill)} — ${esc(it.levelLabel)}</div>
+            <div style="font-size:13px;line-height:1.8;color:#334155;margin-top:2px;">${esc(it.message)}</div>
+          </div>`).join("");
+        return `<div style="border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin:12px 0;">
+          <div style="font-size:15px;font-weight:bold;margin-bottom:6px;">${esc(d.icon)} ${esc(d.title)} <span style="color:#EF9F27;float:left;">${stars}</span></div>${items}</div>`;
+      }).join("");
+
+      const html = `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:620px;margin:auto;color:#0f172a;line-height:1.8;">
+        <div style="background:linear-gradient(135deg,#0ea5e9,#06b6d4);border-radius:16px;padding:20px;text-align:center;color:#fff;">
+          <div style="font-size:13px;opacity:.9;">مجموعة رعاية الطفل للحضانات</div>
+          <div style="font-size:22px;font-weight:bold;margin-top:4px;">🌱 تقرير نمو ${esc(report.childName)}</div>
+          <div style="font-size:13px;margin-top:4px;">${esc(report.monthLabel)}${report.bandLabel ? ` · المرحلة: ${esc(report.bandLabel)}` : ""}${report.teacher ? ` · المعلمة: ${esc(report.teacher)}` : ""}</div>
+        </div>
+        <p style="font-size:15px;margin:16px 0 4px;">عزيزي ولي الأمر،</p>
+        <p style="font-size:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:12px 14px;">${esc(report.intro)}</p>
+        ${domainsHtml}
+        ${report.note ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 14px;font-size:14px;"><b>ملاحظة من المعلمة:</b> ${esc(report.note)}</div>` : ""}
+        <p style="font-size:14px;margin-top:16px;">${attachments.length ? "نسخة PDF من التقرير مرفقة بهذا الإيميل. " : ""}شكراً لثقتكم بنا 💛 ونسعد دائماً بالتواصل معكم لأي استفسار.</p>
+        <p style="font-size:12px;color:#94a3b8;">مجموعة رعاية الطفل للحضانات</p>
+      </div>`;
+
+      const sent: string[] = [];
+      const failed: string[] = [];
+      for (const to of recipients) {
+        try {
+          const res = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from: "مجموعة رعاية الطفل للحضانات <login@childcareuae.com>",
+              to,
+              subject: `🌱 تقرير نمو ${report.childName} — ${report.monthLabel}`,
+              html,
+              attachments,
+            }),
+          });
+          if (res.ok) sent.push(to);
+          else failed.push(`${to}: ${(await res.text()).slice(0, 160)}`);
+        } catch (e) {
+          failed.push(`${to}: ${String(e)}`);
+        }
+      }
+
+      if (sent.length > 0) {
+        await admin
+          .from("monthly_evaluations")
+          .update({ sent_at: new Date().toISOString(), sent_to: sent })
+          .eq("registration_id", registration_id)
+          .eq("month", month);
+      }
+      if (sent.length === 0) return json({ error: "فشل إرسال الإيميل", failed }, 502);
+      return json({ ok: true, sent_to: sent, failed, attached: attachments.length > 0 });
     }
 
     if (action === "list_evaluations") {

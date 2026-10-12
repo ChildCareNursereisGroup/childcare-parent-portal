@@ -2,8 +2,11 @@ import { createRoot } from "react-dom/client";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import FormPrintView from "../FormPrint";
+import EvalPrintView from "../EvalPrint";
 
-export async function generateFormPdfBlob({ f, branchLabel, billing, signatureDataUrl }) {
+// Renders a React element off-screen, rasterizes it with the browser's own text
+// engine (so Arabic shapes correctly) and paginates it into an A4 PDF.
+async function elementToPdfBlob(element) {
   const container = document.createElement("div");
   container.style.position = "fixed";
   container.style.top = "-10000px";
@@ -13,7 +16,7 @@ export async function generateFormPdfBlob({ f, branchLabel, billing, signatureDa
 
   const root = createRoot(container);
   await new Promise((resolve) => {
-    root.render(<FormPrintView f={f} branchLabel={branchLabel} billing={billing} signatureDataUrl={signatureDataUrl} />);
+    root.render(element);
     setTimeout(resolve, 350);
   });
 
@@ -43,4 +46,12 @@ export async function generateFormPdfBlob({ f, branchLabel, billing, signatureDa
   }
 
   return pdf.output("blob");
+}
+
+export function generateFormPdfBlob({ f, branchLabel, billing, signatureDataUrl }) {
+  return elementToPdfBlob(<FormPrintView f={f} branchLabel={branchLabel} billing={billing} signatureDataUrl={signatureDataUrl} />);
+}
+
+export function generateReportPdfBlob({ report, branchLabel }) {
+  return elementToPdfBlob(<EvalPrintView report={report} branchLabel={branchLabel} />);
 }

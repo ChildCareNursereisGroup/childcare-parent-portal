@@ -4,6 +4,7 @@ import {
   Smile, FileText, Users,
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
+import { generateReportPdfBlob } from "./lib/pdfExport";
 import { DOMAINS, AGE_BANDS, LEVELS, skillsFor, messageFor, bandForMonths, ageInMonths } from "./devBank";
 
 export { DOMAINS };
@@ -214,15 +215,75 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
   const msg = (skillId, level) => messageFor({ skillId, level, name: f.name, gender: f.gender, lang });
   const activeFlagAlerts = EVAL_FLAGS[lang].filter((x) => flags.includes(x.id));
 
-  const save = async () => {
-    if (done === 0) { showToast(tr("اختاري مستوى مهارة واحدة على الأقل", "Pick a level for at least one skill")); return; }
-    setSaving(true);
+  const [sending, setSending] = useState(false);
+  const [confirmSend, setConfirmSend] = useState(false);
+  const existingEval = evaluations.find((e) => e.month === month);
+  const emailRe = /^\S+@\S+\.\S+$/;
+  const parentEmails = [...new Set([f.fEmail, f.mEmail, reg.contact_email].map((e) => String(e || "").trim().toLowerCase()).filter((e) => emailRe.test(e)))];
+  const AR_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+  const monthLabelAr = (() => { const [y, m] = month.split("-").map(Number); return `${AR_MONTHS[m - 1]} ${y}`; })();
+
+  const persist = async () => {
     const { data, error } = await supabase.functions.invoke("branch-admin", {
       body: { action: "save_evaluation", token, registration_id: reg.id, month, age_band: band, teacher_name: teacherName, ratings, observations: {}, next_steps: {}, flags, general_note: generalNote },
     });
+    return !(error || data?.error);
+  };
+
+  const save = async () => {
+    if (done === 0) { showToast(tr("اختاري مستوى مهارة واحدة على الأقل", "Pick a level for at least one skill")); return; }
+    setSaving(true);
+    const ok = await persist();
     setSaving(false);
-    if (error || data?.error) { showToast(tr("حصل خطأ في حفظ التقييم", "Failed to save evaluation")); return; }
+    if (!ok) { showToast(tr("حصل خطأ في حفظ التقييم", "Failed to save evaluation")); return; }
     showToast(tr("تم حفظ التقييم الشهري ✓", "Monthly evaluation saved ✓"));
+    load();
+    onChanged();
+  };
+
+  // Always Arabic: the email/PDF go to parents.
+  const buildReport = () => {
+    const first = (f.name || "").trim().split(" ")[0] || "الطفل";
+    const girl = f.gender === "girl";
+    const band_ = AGE_BANDS.find((x) => x.id === band);
+    const domains = DOMAINS.map((d) => {
+      const items = skills[d.id].filter((sk) => ratings[sk.id]).map((sk) => {
+        const L = LEVELS.find((x) => x.v === ratings[sk.id]);
+        return { skill: sk.ar, level: L.v, levelLabel: L.ar, color: L.color, message: messageFor({ skillId: sk.id, level: L.v, name: f.name, gender: f.gender, lang: "ar" }) };
+      });
+      const avg = items.length ? Math.round(items.reduce((n, i) => n + i.level, 0) / items.length) : 0;
+      return { id: d.id, title: d.ar, icon: d.icon, avg, items };
+    }).filter((d) => d.items.length > 0);
+    const strong = domains.flatMap((d) => d.items).filter((i) => i.level >= 5).slice(0, 2).map((i) => `«${i.skill}»`);
+    const support = domains.flatMap((d) => d.items).filter((i) => i.level <= 2).length;
+    let intro = `يسعدنا أن نشارككم تقرير نمو ${first} لشهر ${monthLabelAr}، وقد أعدّته معلمته بعناية بعد متابعة يومية داخل الحضانة.`;
+    if (strong.length) intro += ` ومن أبرز ما ${girl ? "تميّزت" : "تميّز"} به هذا الشهر: ${strong.join(" و")} 🌟.`;
+    if (support > 0) intro += ` وستجدون في التقرير بعض المهارات التي نعمل عليها مع ${first} ونقترح دعمها في المنزل 💛.`;
+    return { childName: first, monthLabel: monthLabelAr, bandLabel: band_?.ar, teacher: teacherName, intro, note: generalNote, domains };
+  };
+
+  const sendReport = async () => {
+    setConfirmSend(false);
+    if (done === 0) { showToast(tr("اختاري مستوى مهارة واحدة على الأقل", "Pick a level for at least one skill")); return; }
+    if (parentEmails.length === 0) { showToast(tr("مفيش إيميل صحيح لولي الأمر", "No valid parent email")); return; }
+    setSending(true);
+    const ok = await persist();
+    if (!ok) { setSending(false); showToast(tr("حصل خطأ في حفظ التقييم", "Failed to save evaluation")); return; }
+    const report = buildReport();
+    const BRANCH = BRANCH_LABELS[reg.branch];
+    let pdfPath = null;
+    try {
+      const blob = await generateReportPdfBlob({ report, branchLabel: BRANCH ? BRANCH.ar : "" });
+      const path = `${reg.id}/eval-${month}-${Date.now()}.pdf`;
+      const { error: upErr } = await supabase.storage.from("registration-documents").upload(path, blob, { contentType: "application/pdf" });
+      if (!upErr) pdfPath = path;
+    } catch (_e) { pdfPath = null; }
+    const { data, error } = await supabase.functions.invoke("branch-admin", {
+      body: { action: "send_evaluation", token, registration_id: reg.id, month, report, pdf_path: pdfPath },
+    });
+    setSending(false);
+    if (error || data?.error) { showToast(tr("فشل إرسال الإيميل، التقييم اتحفظ — جرّبي تاني", "Email failed — evaluation was saved, try again")); load(); return; }
+    showToast(tr(`تم إرسال التقرير لـ ${data.sent_to.length} إيميل ✓${data.attached ? "" : " (من غير مرفق PDF)"}`, `Report sent to ${data.sent_to.length} email(s) ✓`));
     load();
     onChanged();
   };
@@ -236,6 +297,7 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
       <p className="text-[11px] text-slate-400 mb-2 text-right">{tr("يُسجَّل مرة واحدة كل شهر، في آخر الشهر.", "Recorded once a month, at the end of the month.")}</p>
       <div className={`text-[11px] font-bold rounded-xl px-2.5 py-1.5 mb-3 text-right ${alreadyDone ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-700"}`}>
         {alreadyDone ? tr(`✓ تقييم ${month} محفوظ (تقدري تعدّليه)`, `✓ ${month} evaluation saved (you can edit it)`) : tr(`⏳ تقييم ${month} لسه ما اتسجلش`, `⏳ ${month} evaluation not recorded yet`)}
+        {existingEval?.sent_at && <span className="block text-emerald-700 mt-0.5">{tr(`📧 اتبعت للأهل يوم ${new Date(existingEval.sent_at).toLocaleDateString("ar-AE")}`, `📧 Sent to parents on ${new Date(existingEval.sent_at).toLocaleDateString()}`)}</span>}
       </div>
 
       <p className="text-[11px] text-slate-500 mb-1 text-right">{tr(`عمر الطفل في الشهر ده: ${ageText}`, `Child's age this month: ${ageText}`)}</p>
@@ -320,9 +382,25 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
       <textarea value={generalNote} onChange={(e) => setGeneralNote(e.target.value)} placeholder={tr("ملاحظة عامة للأهل (اختياري)", "General note to parents (optional)")} rows={2}
         className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mt-2 bg-white text-slate-800" />
 
-      <button onClick={save} disabled={saving} className="w-full bg-sky-500 text-white font-bold py-2.5 rounded-xl text-xs mt-3 disabled:opacity-60">
-        {saving ? tr("جارِ الحفظ...", "Saving...") : tr("حفظ التقييم الشهري", "Save monthly evaluation")}
-      </button>
+      {confirmSend && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3 space-y-2 text-right">
+          <p className="text-xs font-bold text-amber-800">{tr("هيتبعت التقرير للأهل على:", "The report will be emailed to:")}</p>
+          {parentEmails.map((e) => (<p key={e} className="text-[11px] text-slate-700" dir="ltr">{e}</p>))}
+          <p className="text-[11px] text-amber-700">{tr(`تم تقييم ${done} من ${total} مهارة. مرفق معاه ملف PDF.`, `${done} of ${total} skills rated. A PDF is attached.`)}</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setConfirmSend(false)} className="flex-1 bg-white border border-slate-200 text-slate-600 font-bold py-2 rounded-xl text-xs">{tr("إلغاء", "Cancel")}</button>
+            <button type="button" onClick={sendReport} className="flex-1 bg-emerald-500 text-white font-bold py-2 rounded-xl text-xs">{tr("أيوه، ابعتي", "Yes, send")}</button>
+          </div>
+        </div>
+      )}
+      <div className="flex gap-2 mt-3">
+        <button onClick={save} disabled={saving || sending} className="flex-1 bg-white border border-sky-300 text-sky-600 font-bold py-2.5 rounded-xl text-xs disabled:opacity-60">
+          {saving ? tr("جارِ الحفظ...", "Saving...") : tr("حفظ فقط", "Save only")}
+        </button>
+        <button onClick={() => setConfirmSend(true)} disabled={sending || saving} className="flex-[2] bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs disabled:opacity-60">
+          {sending ? tr("جارِ الإرسال...", "Sending...") : existingEval?.sent_at ? tr("📧 إعادة إرسال للأهل", "📧 Resend to parents") : tr("✅ إكمال وإرسال للأهل", "✅ Complete & send to parents")}
+        </button>
+      </div>
 
       {evaluations.length > 0 && (
         <div className="mt-3 pt-2 border-t border-slate-200 space-y-1">
