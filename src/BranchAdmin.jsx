@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import { generateReportPdfBlob } from "./lib/pdfExport";
-import { DOMAINS, AGE_BANDS, LEVELS, skillsFor, messageFor, bandForMonths, ageInMonths } from "./devBank";
+import { DOMAINS, AGE_BANDS, LEVELS, skillsFor, messageFor, parentTip, staffTip, bandForMonths, ageInMonths } from "./devBank";
 
 export { DOMAINS };
 
@@ -18,7 +18,8 @@ const BRANCH_LABELS = {
 };
 
 const DOC_LABELS = {
-  full_form_pdf: { ar: "الاستمارة كاملة (PDF)", en: "Full form (PDF)" },
+  full_form_pdf: { ar: "الاستمارة بالعربي (PDF)", en: "Arabic form (PDF)" },
+  full_form_pdf_en: { ar: "الاستمارة بالإنجليزي (PDF)", en: "English form (PDF)" },
   father_id: { ar: "هوية الأب", en: "Father's ID" },
   mother_id: { ar: "هوية الأم", en: "Mother's ID" },
   child_id: { ar: "هوية/شهادة ميلاد الطفل", en: "Child's ID/birth cert." },
@@ -215,6 +216,7 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
   const msg = (skillId, level) => messageFor({ skillId, level, name: f.name, gender: f.gender, lang });
   const activeFlagAlerts = EVAL_FLAGS[lang].filter((x) => flags.includes(x.id));
 
+  const lowSkills = DOMAINS.flatMap((d) => skills[d.id].filter((x) => ratings[x.id] && ratings[x.id] <= 2).map((x) => ({ ...x, domainAr: d.ar, domainEn: d.en })));
   const [sending, setSending] = useState(false);
   const [confirmSend, setConfirmSend] = useState(false);
   const existingEval = evaluations.find((e) => e.month === month);
@@ -241,25 +243,39 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
     onChanged();
   };
 
-  // Always Arabic: the email/PDF go to parents.
-  const buildReport = () => {
-    const first = (f.name || "").trim().split(" ")[0] || "الطفل";
+  // The emailed report exists in Arabic AND English (two PDFs).
+  const EN_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const buildReport = (L2) => {
+    const en = L2 === "en";
+    const first = (f.name || "").trim().split(" ")[0] || (en ? "Your child" : "الطفل");
     const girl = f.gender === "girl";
     const band_ = AGE_BANDS.find((x) => x.id === band);
+    const monthLabel = (() => { const [y, m] = month.split("-").map(Number); return en ? `${EN_MONTHS[m - 1]} ${y}` : `${AR_MONTHS[m - 1]} ${y}`; })();
     const domains = DOMAINS.map((d) => {
       const items = skills[d.id].filter((sk) => ratings[sk.id]).map((sk) => {
-        const L = LEVELS.find((x) => x.v === ratings[sk.id]);
-        return { skill: sk.ar, level: L.v, levelLabel: L.ar, color: L.color, message: messageFor({ skillId: sk.id, level: L.v, name: f.name, gender: f.gender, lang: "ar" }) };
+        const Lv = LEVELS.find((x) => x.v === ratings[sk.id]);
+        return {
+          skill: en ? sk.en : sk.ar, level: Lv.v, levelLabel: en ? Lv.en : Lv.ar, color: Lv.color,
+          message: messageFor({ skillId: sk.id, level: Lv.v, name: f.name, gender: f.gender, lang: L2 }),
+          tip: parentTip({ skillId: sk.id, level: Lv.v, gender: f.gender, lang: L2 }),
+        };
       });
       const avg = items.length ? Math.round(items.reduce((n, i) => n + i.level, 0) / items.length) : 0;
-      return { id: d.id, title: d.ar, icon: d.icon, avg, items };
+      return { id: d.id, title: en ? d.en : d.ar, icon: d.icon, avg, items };
     }).filter((d) => d.items.length > 0);
     const strong = domains.flatMap((d) => d.items).filter((i) => i.level >= 5).slice(0, 2).map((i) => `«${i.skill}»`);
     const support = domains.flatMap((d) => d.items).filter((i) => i.level <= 2).length;
-    let intro = `يسعدنا أن نشارككم تقرير نمو ${first} لشهر ${monthLabelAr}، وقد أعدّته معلمته بعناية بعد متابعة يومية داخل الحضانة.`;
-    if (strong.length) intro += ` ومن أبرز ما ${girl ? "تميّزت" : "تميّز"} به هذا الشهر: ${strong.join(" و")} 🌟.`;
-    if (support > 0) intro += ` وستجدون في التقرير بعض المهارات التي نعمل عليها مع ${first} ونقترح دعمها في المنزل 💛.`;
-    return { childName: first, monthLabel: monthLabelAr, bandLabel: band_?.ar, teacher: teacherName, intro, note: generalNote, domains };
+    let intro;
+    if (en) {
+      intro = `We are happy to share ${first}'s development report for ${monthLabel}, prepared with care by ${girl ? "her" : "his"} teacher after daily observation at the nursery.`;
+      if (strong.length) intro += ` Highlights this month: ${strong.join(" and ")} 🌟.`;
+      if (support > 0) intro += ` You will also find a few skills we are working on with ${first}, with simple tips you can try at home 💛.`;
+    } else {
+      intro = `يسعدنا أن نشارككم تقرير نمو ${first} لشهر ${monthLabel}، وقد أعدّته معلمته بعناية بعد متابعة يومية داخل الحضانة.`;
+      if (strong.length) intro += ` ومن أبرز ما ${girl ? "تميّزت" : "تميّز"} به هذا الشهر: ${strong.join(" و")} 🌟.`;
+      if (support > 0) intro += ` وستجدون في التقرير بعض المهارات التي نعمل عليها مع ${first} ومعها نصائح بسيطة يمكنكم تطبيقها في المنزل 💛.`;
+    }
+    return { lang: L2, childName: first, monthLabel, bandLabel: en ? band_?.en : band_?.ar, teacher: teacherName, intro, note: generalNote, domains };
   };
 
   const sendReport = async () => {
@@ -269,17 +285,19 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
     setSending(true);
     const ok = await persist();
     if (!ok) { setSending(false); showToast(tr("حصل خطأ في حفظ التقييم", "Failed to save evaluation")); return; }
-    const report = buildReport();
+    const reports = { ar: buildReport("ar"), en: buildReport("en") };
     const BRANCH = BRANCH_LABELS[reg.branch];
-    let pdfPath = null;
-    try {
-      const blob = await generateReportPdfBlob({ report, branchLabel: BRANCH ? BRANCH.ar : "" });
-      const path = `${reg.id}/eval-${month}-${Date.now()}.pdf`;
-      const { error: upErr } = await supabase.storage.from("registration-documents").upload(path, blob, { contentType: "application/pdf" });
-      if (!upErr) pdfPath = path;
-    } catch (_e) { pdfPath = null; }
+    const pdf_paths = {};
+    for (const L2 of ["ar", "en"]) {
+      try {
+        const blob = await generateReportPdfBlob({ report: reports[L2], branchLabel: BRANCH ? BRANCH[L2] : "" });
+        const path = `${reg.id}/eval-${month}-${L2}-${Date.now()}.pdf`;
+        const { error: upErr } = await supabase.storage.from("registration-documents").upload(path, blob, { contentType: "application/pdf" });
+        if (!upErr) pdf_paths[L2] = path;
+      } catch (_e) { /* send without this PDF */ }
+    }
     const { data, error } = await supabase.functions.invoke("branch-admin", {
-      body: { action: "send_evaluation", token, registration_id: reg.id, month, report, pdf_path: pdfPath },
+      body: { action: "send_evaluation", token, registration_id: reg.id, month, reports, pdf_paths },
     });
     setSending(false);
     if (error || data?.error) { showToast(tr("فشل إرسال الإيميل، التقييم اتحفظ — جرّبي تاني", "Email failed — evaluation was saved, try again")); load(); return; }
@@ -341,6 +359,16 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
                           })}
                         </div>
                         {lv && <p className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 rounded-lg p-2 mt-1.5 text-right">{msg(s.id, lv)}</p>}
+                        {lv && lv <= 2 && (
+                          <div className="mt-1.5 space-y-1">
+                            <p className="text-[11px] leading-relaxed text-violet-800 bg-violet-50 border border-violet-100 rounded-lg p-2 text-right">
+                              <b>{tr("🧑‍🏫 للمعلمة (تعمليه مع الطفل في الحضانة): ", "🧑‍🏫 For staff (do with the child in class): ")}</b>{staffTip({ skillId: s.id, level: lv, gender: f.gender, lang })}
+                            </p>
+                            <p className="text-[11px] leading-relaxed text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-2 text-right">
+                              <b>{tr("🏠 للأهل (هتظهر في التقرير): ", "🏠 For parents (shown in the report): ")}</b>{parentTip({ skillId: s.id, level: lv, gender: f.gender, lang })}
+                            </p>
+                          </div>
+                        )}
                         <button type="button" onClick={() => setShowAllMsgs((m) => ({ ...m, [s.id]: !m[s.id] }))} className="text-[10.5px] text-sky-500 font-bold mt-1">
                           {showAllMsgs[s.id] ? tr("إخفاء الصيغ الجاهزة", "Hide ready messages") : tr("عرض الصيغ الخمس الجاهزة", "Show the 5 ready messages")}
                         </button>
@@ -365,6 +393,17 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
         })}
       </div>
 
+      {lowSkills.length > 0 && (
+        <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 mt-3 text-right space-y-2">
+          <p className="text-xs font-bold text-violet-800">{tr("🧑‍🏫 خطة الدعم للمعلمة — مهارات محتاجة تدريب إضافي", "🧑‍🏫 Staff support plan — skills that need extra practice")}</p>
+          {lowSkills.map((x) => (
+            <div key={x.id} className="text-[11px] leading-relaxed text-slate-700">
+              <b>{tr(x.ar, x.en)}</b> <span className="text-slate-400">({tr(x.domainAr, x.domainEn)})</span>
+              <br />{staffTip({ skillId: x.id, level: ratings[x.id], gender: f.gender, lang })}
+            </div>
+          ))}
+        </div>
+      )}
       <p className="text-[11px] font-bold text-slate-500 mt-3 mb-1.5 text-right">{tr("علامات متابعة (للفريق فقط — مش بتظهر للأهل)", "Follow-up flags (staff only — not shown to parents)")}</p>
       <div className="flex flex-wrap gap-1.5 justify-end">
         {EVAL_FLAGS[lang].map((x) => (
@@ -386,7 +425,7 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3 space-y-2 text-right">
           <p className="text-xs font-bold text-amber-800">{tr("هيتبعت التقرير للأهل على:", "The report will be emailed to:")}</p>
           {parentEmails.map((e) => (<p key={e} className="text-[11px] text-slate-700" dir="ltr">{e}</p>))}
-          <p className="text-[11px] text-amber-700">{tr(`تم تقييم ${done} من ${total} مهارة. مرفق معاه ملف PDF.`, `${done} of ${total} skills rated. A PDF is attached.`)}</p>
+          <p className="text-[11px] text-amber-700">{tr(`تم تقييم ${done} من ${total} مهارة. مرفق معاه ملفين PDF (عربي وإنجليزي).`, `${done} of ${total} skills rated. Two PDFs are attached (Arabic + English).`)}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => setConfirmSend(false)} className="flex-1 bg-white border border-slate-200 text-slate-600 font-bold py-2 rounded-xl text-xs">{tr("إلغاء", "Cancel")}</button>
             <button type="button" onClick={sendReport} className="flex-1 bg-emerald-500 text-white font-bold py-2 rounded-xl text-xs">{tr("أيوه، ابعتي", "Yes, send")}</button>

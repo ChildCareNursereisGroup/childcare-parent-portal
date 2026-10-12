@@ -26,9 +26,15 @@ const PAIRS = [
 ];
 
 const MAP = Object.fromEntries(PAIRS.map((p) => p.split("|")));
+const MAP_EN = Object.fromEntries(PAIRS.map((p) => { const [en] = p.split("|"); return [en, en]; }));
+const EN_PRETTY = { yes: "Yes", no: "No", boy: "Boy", girl: "Girl", married: "Married", separated: "Separated", widowed: "Widowed/Widower", only: "Only child", first: "Eldest", middle: "Middle", last: "Youngest", monthly: "Monthly", weekly: "Weekly", daily: "Daily", bus: "Nursery bus", parent: "With parent", Unknown: "Unknown" };
 
 // Arabic for a stored value; falls back to the value itself (free text, "Other" text, numbers).
 export const toAr = (v) => (v === undefined || v === null || v === "" ? "" : MAP[v] || String(v));
 
 // "Other" selections store the typed text in <key>Other.
 export const withOther = (v, other) => (v === "Other" ? other || "غير ذلك" : toAr(v));
+
+// Same lookups for either language of the printed form.
+export const toLang = (v, lang) => (lang === "en" ? (v === undefined || v === null || v === "" ? "" : EN_PRETTY[v] || MAP_EN[v] || String(v)) : toAr(v));
+export const withOtherL = (v, other, lang) => (v === "Other" ? other || (lang === "en" ? "Other" : "غير ذلك") : toLang(v, lang));

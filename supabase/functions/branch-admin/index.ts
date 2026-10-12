@@ -16,7 +16,7 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DOC_KEYS = ["father_id", "mother_id", "child_id", "child_photo", "vaccination_card", "signature", "full_form_pdf"];
+const DOC_KEYS = ["father_id", "mother_id", "child_id", "child_photo", "vaccination_card", "signature", "full_form_pdf", "full_form_pdf_en"];
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -364,8 +364,8 @@ Deno.serve(async (req) => {
     if (action === "send_evaluation") {
       const branch = await requireBranchSession(body.token);
       if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
-      const { registration_id, month, report, pdf_path } = body;
-      if (!registration_id || !month || !report?.domains) return json({ error: "بيانات ناقصة" }, 400);
+      const { registration_id, month, reports, pdf_paths } = body;
+      if (!registration_id || !month || !reports?.ar?.domains || !reports?.en?.domains) return json({ error: "بيانات ناقصة" }, 400);
 
       const { data: reg, error: regErr } = await admin
         .from("portal_registrations")
@@ -385,40 +385,55 @@ Deno.serve(async (req) => {
 
       const esc = (v: unknown) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] || c));
 
-      let attachments: { filename: string; content: string }[] = [];
-      if (typeof pdf_path === "string" && pdf_path.startsWith(`${registration_id}/`)) {
-        const { data: file } = await admin.storage.from("registration-documents").download(pdf_path);
-        if (file) {
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          let bin = "";
-          for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-          attachments = [{ filename: `تقرير-نمو-${month}.pdf`, content: btoa(bin) }];
-        }
+      // Both PDFs (Arabic + English) are attached.
+      const attachments: { filename: string; content: string }[] = [];
+      for (const lg of ["ar", "en"] as const) {
+        const path = pdf_paths?.[lg];
+        if (typeof path !== "string" || !path.startsWith(`${registration_id}/`)) continue;
+        const { data: file } = await admin.storage.from("registration-documents").download(path);
+        if (!file) continue;
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        let bin = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        attachments.push({ filename: lg === "ar" ? `تقرير-نمو-${month}-عربي.pdf` : `Development-Report-${month}-English.pdf`, content: btoa(bin) });
       }
+
+      // Email body in the language the parent used when registering.
+      const L: "ar" | "en" = reg.form_data?.consentLang === "en" ? "en" : "ar";
+      const en = L === "en";
+      const report = reports[L];
+      const T = en
+        ? { dir: "ltr", side: "left", group: "Child Care Nurseries Group", title: (n: string) => `🌱 ${n}'s Development Report`, stage: "Stage", teacher: "Teacher", dear: "Dear parent,", note: "Note from the teacher:", tip: "💡 Tip for parents:",
+            outro: (pdf: boolean) => `${pdf ? "PDF copies of the report (Arabic and English) are attached. " : ""}Thank you for trusting us 💛 — we're always happy to hear from you.`,
+            subject: (n: string, m: string) => `🌱 ${n}'s development report — ${m}` }
+        : { dir: "rtl", side: "right", group: "مجموعة رعاية الطفل للحضانات", title: (n: string) => `🌱 تقرير نمو ${n}`, stage: "المرحلة", teacher: "المعلمة", dear: "عزيزي ولي الأمر،", note: "ملاحظة من المعلمة:", tip: "💡 نصيحة للأهل:",
+            outro: (pdf: boolean) => `${pdf ? "نسختان PDF من التقرير (عربي وإنجليزي) مرفقتان بهذا الإيميل. " : ""}شكراً لثقتكم بنا 💛 ونسعد دائماً بالتواصل معكم لأي استفسار.`,
+            subject: (n: string, m: string) => `🌱 تقرير نمو ${n} — ${m}` };
 
       const domainsHtml = (report.domains as any[]).map((d) => {
         const stars = "★".repeat(d.avg || 0) + `<span style="color:#e2e8f0">${"★".repeat(5 - (d.avg || 0))}</span>`;
         const items = (d.items as any[]).map((it) => `
-          <div style="border-right:4px solid ${esc(it.color)};background:#f8fafc;border-radius:8px;padding:8px 12px;margin:6px 0;">
-            <div style="font-size:12px;font-weight:bold;color:${esc(it.color)};">${esc(it.skill)} — ${esc(it.levelLabel)}</div>
-            <div style="font-size:13px;line-height:1.8;color:#334155;margin-top:2px;">${esc(it.message)}</div>
+          <div style="border-${T.side}:4px solid ${esc(it.color)};background:#f8fafc;border-radius:8px;padding:8px 12px;margin:6px 0;">
+            <div style="font-size:14px;font-weight:bold;color:${esc(it.color)};">${esc(it.skill)} — ${esc(it.levelLabel)}</div>
+            <div style="font-size:15px;line-height:1.8;color:#334155;margin-top:2px;">${esc(it.message)}</div>
+            ${it.tip ? `<div style="font-size:14px;line-height:1.8;color:#065f46;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:8px 12px;margin-top:6px;"><b>${T.tip}</b> ${esc(it.tip)}</div>` : ""}
           </div>`).join("");
         return `<div style="border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin:12px 0;">
-          <div style="font-size:15px;font-weight:bold;margin-bottom:6px;">${esc(d.icon)} ${esc(d.title)} <span style="color:#EF9F27;float:left;">${stars}</span></div>${items}</div>`;
+          <div style="font-size:17px;font-weight:bold;margin-bottom:6px;">${esc(d.icon)} ${esc(d.title)} <span style="color:#EF9F27;float:${en ? "right" : "left"};">${stars}</span></div>${items}</div>`;
       }).join("");
 
-      const html = `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:620px;margin:auto;color:#0f172a;line-height:1.8;">
+      const html = `<div dir="${T.dir}" style="font-family:Tahoma,Arial,sans-serif;max-width:620px;margin:auto;color:#0f172a;line-height:1.8;">
         <div style="background:linear-gradient(135deg,#0ea5e9,#06b6d4);border-radius:16px;padding:20px;text-align:center;color:#fff;">
-          <div style="font-size:13px;opacity:.9;">مجموعة رعاية الطفل للحضانات</div>
-          <div style="font-size:22px;font-weight:bold;margin-top:4px;">🌱 تقرير نمو ${esc(report.childName)}</div>
-          <div style="font-size:13px;margin-top:4px;">${esc(report.monthLabel)}${report.bandLabel ? ` · المرحلة: ${esc(report.bandLabel)}` : ""}${report.teacher ? ` · المعلمة: ${esc(report.teacher)}` : ""}</div>
+          <div style="font-size:14px;opacity:.9;">${T.group}</div>
+          <div style="font-size:24px;font-weight:bold;margin-top:4px;">${esc(T.title(report.childName))}</div>
+          <div style="font-size:14px;margin-top:4px;">${esc(report.monthLabel)}${report.bandLabel ? ` · ${T.stage}: ${esc(report.bandLabel)}` : ""}${report.teacher ? ` · ${T.teacher}: ${esc(report.teacher)}` : ""}</div>
         </div>
-        <p style="font-size:15px;margin:16px 0 4px;">عزيزي ولي الأمر،</p>
-        <p style="font-size:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:12px 14px;">${esc(report.intro)}</p>
+        <p style="font-size:16px;margin:16px 0 4px;">${T.dear}</p>
+        <p style="font-size:15px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:12px 14px;">${esc(report.intro)}</p>
         ${domainsHtml}
-        ${report.note ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 14px;font-size:14px;"><b>ملاحظة من المعلمة:</b> ${esc(report.note)}</div>` : ""}
-        <p style="font-size:14px;margin-top:16px;">${attachments.length ? "نسخة PDF من التقرير مرفقة بهذا الإيميل. " : ""}شكراً لثقتكم بنا 💛 ونسعد دائماً بالتواصل معكم لأي استفسار.</p>
-        <p style="font-size:12px;color:#94a3b8;">مجموعة رعاية الطفل للحضانات</p>
+        ${report.note ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 14px;font-size:15px;"><b>${T.note}</b> ${esc(report.note)}</div>` : ""}
+        <p style="font-size:15px;margin-top:16px;">${T.outro(attachments.length > 0)}</p>
+        <p style="font-size:12px;color:#94a3b8;">${T.group}</p>
       </div>`;
 
       const sent: string[] = [];
@@ -431,7 +446,7 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
               from: "مجموعة رعاية الطفل للحضانات <login@childcareuae.com>",
               to,
-              subject: `🌱 تقرير نمو ${report.childName} — ${report.monthLabel}`,
+              subject: T.subject(report.childName, report.monthLabel),
               html,
               attachments,
             }),

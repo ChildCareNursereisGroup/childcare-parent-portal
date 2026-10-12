@@ -101,45 +101,113 @@ for (const band of Object.keys(BANK)) {
 }
 export const skillById = (id) => ALL[id];
 
-const TIPS = {
-  ar: {
-    lang: "ننصح بالحديث {معه|معها} والقراءة {له|لها} يومياً.",
-    motor_g: "ننصح بإتاحة وقت للّعب الحركي والمشي في الحديقة.",
-    motor_f: "ننصح بالألعاب الصغيرة كالصلصال والخرز والتلوين.",
-    social: "ننصح بإتاحة فرص اللعب مع الأطفال وتشجيع{ه|ها} على المشاركة.",
-    cognitive: "ننصح بالألغاز وألعاب التصنيف والمطابقة.",
-    selfcare: "ننصح بإعطائ{ه|ها} فرصة المحاولة بنفس{ه|ها}.",
-  },
-  en: {
-    lang: "We recommend talking and reading together every day.",
-    motor_g: "We recommend active play and walks outdoors.",
-    motor_f: "We recommend small-hand play such as dough, beads and colouring.",
-    social: "We recommend regular playtime with other children.",
-    cognitive: "We recommend puzzles and sorting/matching games.",
-    selfcare: "We recommend letting {him|her} try by {himself|herself}.",
-  },
-};
-
 const TPL = {
   ar: {
     5: "🌟 ما شاء الله! {n} {أتقن|أتقنت} مهارة «{s}»، و{يؤديها|تؤديها} باستقلالية وثقة.",
     4: "⭐ {n} {يؤدي|تؤدي} مهارة «{s}» بشكل جيد جداً، و{يحتاج|تحتاج} فقط إلى لمسة تشجيع للوصول إلى الإتقان.",
     3: "👍 {n} في تقدّم مستمر في مهارة «{s}»، و{يؤديها|تؤديها} أحياناً {بمفرده|بمفردها} وأحياناً بمساعدة المعلمة.",
-    2: "🌱 {n} {بدأ|بدأت} {يتعرّف|تتعرّف} على مهارة «{s}»، و{يحتاج|تحتاج} إلى مساعدة وتكرار للتدريب عليها. {tip}",
-    1: "💛 لم تظهر مهارة «{s}» لدى {n} بعد، وهذا طبيعي فلكل طفل وتيرته الخاصة؛ وسنعمل على تهيئتها بأنشطة مبسّطة. {tip}",
+    2: "🌱 {n} {بدأ|بدأت} {يتعرّف|تتعرّف} على مهارة «{s}»، و{يحتاج|تحتاج} إلى مساعدة وتكرار للتدريب عليها.",
+    1: "💛 لم تظهر مهارة «{s}» لدى {n} بعد، وهذا طبيعي فلكل طفل وتيرته الخاصة؛ وسنعمل على تهيئتها بأنشطة مبسّطة.",
   },
   en: {
     5: "🌟 MashaAllah! {n} has mastered «{s}» and does it independently and with confidence.",
     4: "⭐ {n} does «{s}» very well and only needs a little encouragement to master it.",
     3: "👍 {n} is making steady progress in «{s}» — {he|she} does it alone sometimes and with the teacher's help at other times.",
-    2: "🌱 {n} is just starting to learn «{s}» and needs help and repetition to practise. {tip}",
-    1: "💛 «{s}» hasn't appeared yet for {n}, which is perfectly normal — every child has their own pace. We'll introduce it with simple activities. {tip}",
+    2: "🌱 {n} is just starting to learn «{s}» and needs help and repetition to practise.",
+    1: "💛 «{s}» hasn't appeared yet for {n}, which is perfectly normal — every child has their own pace. We'll introduce it with simple activities.",
   },
 };
 
 function gen(str, gender) {
   const f = gender === "girl";
-  return str.replace(/\{([^{}|]+)\|([^{}|]+)\}/g, (_m, a, b) => (f ? b : a));
+  return str.replace(/\{([^{}|]*)\|([^{}|]*)\}/g, (_m, a, b) => (f ? b : a));
+}
+
+// ---- Activities to support skills the child hasn't mastered yet (levels 1-2) ----
+// Stage groups: baby = bands A-B (0-12m), toddler = C-D (1-3y), pre = E (3-4y).
+const groupOf = (band) => (band === "A" || band === "B" ? "baby" : band === "E" ? "pre" : "toddler");
+
+const ACTIVITIES = {
+  parent: {
+    lang: {
+      baby: ["تحدّثوا مع {طفلكم|طفلتكم} كثيراً أثناء الاستحمام والأكل، وغنّوا {له|لها} الأغاني القصيرة وقلّدوا أصواته{|ا} بابتسامة.", "Talk and sing to your baby often during bath and feeding times, and copy the sounds {he|she} makes with a smile."],
+      toddler: ["اقرؤوا قصة مصوّرة قصيرة كل ليلة، واسألوا {طفلكم|طفلتكم} «وين القطة؟» ثم كرّروا الكلمة بشكل صحيح وأضيفوا لها كلمة.", "Read a short picture book every night, ask \"Where is the cat?\", then repeat the word correctly and add one more word."],
+      pre: ["شجّعوا {طفلكم|طفلتكم} على حكاية ما حدث في يومه{|ا} بجمل كاملة، والعبوا لعبة «أنا أرى...» لوصف الأشياء من حولكم.", "Encourage your child to tell you about the day in full sentences, and play \"I spy...\" to describe things around you."],
+    },
+    motor_g: {
+      baby: ["ضعوا {طفلكم|طفلتكم} على بطنه{|ا} على سجادة آمنة عدة مرات يومياً، وضعوا لعبة ملوّنة أمامه{|ا} {ليحاول|لتحاول} الوصول إليها.", "Give your baby daily tummy time on a safe mat, with a colourful toy just out of reach to encourage reaching and crawling."],
+      toddler: ["اخرجوا للحديقة يومياً: امشوا، اركضوا، اقفزوا، واركلوا الكرة مع {طفلكم|طفلتكم}، وساعدوه{|ا} على صعود الدرج {ممسكاً|ممسكة} بيدكم.", "Visit the park daily: walk, run, jump and kick a ball together, and help your child climb stairs holding your hand."],
+      pre: ["العبوا ألعاب القفز على قدم واحدة والتوازن على خط مرسوم على الأرض ورمي الكرة واصطيادها لمدة 10 دقائق يومياً.", "Play hopping on one foot, balancing along a line on the floor and throwing/catching a ball for 10 minutes a day."],
+    },
+    motor_f: {
+      baby: ["أعطوا {طفلكم|طفلتكم} ألعاباً آمنة {يمسكها ويهزّها وينقلها|تمسكها وتهزّها وتنقلها} من يد لأخرى، وشجّعوه{|ا} على الإمساك بقطع طعام ناعمة.", "Offer safe toys to grasp, shake and pass between hands, and let your baby pick up soft finger foods."],
+      toddler: ["العبوا بالصلصال والخرز الكبير وبرج المكعبات، ودعوه{|ا} {يخربش|تخربش} بالألوان الشمعية الكبيرة على ورق كبير.", "Play with dough, large beads and block towers, and let your child scribble with chunky crayons on big paper."],
+      pre: ["مارسوا القص بالمقص الآمن والتلوين داخل الخطوط وتشكيل الصلصال وفكّ وربط الأزرار لتقوية أصابعه{|ا}.", "Practise safe scissor cutting, colouring inside lines, dough shaping and buttoning to strengthen small hands."],
+    },
+    social: {
+      baby: ["ابتسموا لـ{طفلكم|طفلتكم} وتبادلوا معه{|ا} النظرات واللعب بـ«بيك-أبو»، وعرّفوه{|ا} بأشخاص جدد بوجودكم.", "Smile, make eye contact and play peek-a-boo, and introduce new people while you stay close by."],
+      toddler: ["رتّبوا مواعيد لعب قصيرة مع أطفال آخرين، وعلّموا {طفلكم|طفلتكم} كلمات «من فضلك» و«شكراً» وتبادل الأدوار في اللعب.", "Arrange short playdates with other children and practise saying \"please\" and \"thank you\" and taking turns."],
+      pre: ["العبوا ألعاب الطاولة البسيطة التي تتطلب انتظار الدور، وتحدّثوا عن مشاعره{|ا} وكيف نتصرف حين نغضب أو نحزن.", "Play simple board games that need turn-taking, and talk about feelings and what to do when we are angry or sad."],
+    },
+    cognitive: {
+      baby: ["أروا {طفلكم|طفلتكم} ألعاباً ملوّنة وحرّكوها ببطء {ليتابعها|لتتابعها} بعينيه{|ا}، ثم أخفوها تحت قطعة قماش {ليبحث|لتبحث} عنها.", "Show colourful toys and move them slowly for your baby to follow, then hide one under a cloth for them to find."],
+      toddler: ["قدّموا ألغاز القطع الكبيرة وألعاب تصنيف الألوان والأشكال، واطلبوا منه{|ا} {أن يضع|أن تضع} الأشياء في صناديق حسب لونها.", "Offer big-piece puzzles and colour/shape sorting games, and ask your child to sort objects into boxes by colour."],
+      pre: ["العبوا ألعاب الذاكرة والمطابقة والعدّ بالأشياء اليومية (حبات فاكهة، ملاعق)، وتعرّفوا معاً على حرف أو رقم جديد كل أسبوع.", "Play memory/matching games, count everyday objects (fruit, spoons) and learn a new letter or number together each week."],
+    },
+    selfcare: {
+      baby: ["دعوا {طفلكم|طفلتكم} {يمسك|تمسك} الملعقة أو كوب التدريب ولو اتّسخ الطعام، وكرّروا الروتين نفسه يومياً للنوم والأكل.", "Let your baby hold the spoon or a training cup even if it gets messy, and keep feeding and sleep routines consistent."],
+      toddler: ["اتركوا {طفلكم|طفلتكم} {يحاول|تحاول} خلع الحذاء والجوارب بنفسه{|ا}، وخصّصوا وقتاً ثابتاً للحمام، وامدحوا كل محاولة حتى لو لم تنجح.", "Let your child try taking off shoes and socks, set regular potty times, and praise every attempt even if it doesn't succeed."],
+      pre: ["اتركوا {طفلكم|طفلتكم} {يلبس|تلبس} ملابسه{|ا} {ويغسل|وتغسل} يديه{|ا} {ويرتّب|وترتّب} ألعابه{|ا} بنفسه{|ا} كل يوم، ولا تتدخّلوا إلا عند الحاجة وامنحوه{|ا} وقتاً كافياً.", "Let your child dress, wash hands and tidy toys alone every day; step in only when needed and allow plenty of time."],
+    },
+  },
+  staff: {
+    lang: {
+      baby: ["تحدّثي مع الطفل أثناء الروتين اليومي (تغيير الحفاض، الأكل) وسمّي كل شيء تلمسينه، وغنّي أغنية قصيرة يومياً.", "Narrate the daily routine (nappy changes, meals), name everything you touch, and sing a short song daily."],
+      toddler: ["اقرئي قصة مصوّرة في حلقة صغيرة يومياً واسألي أسئلة بسيطة، وأعطي الطفل وقتاً ليجيب، ثم وسّعي جملته بكلمة.", "Read a picture story to a small group daily with simple questions; wait for the answer and expand the child's phrase by one word."],
+      pre: ["خصّصي وقتاً للحكي في الحلقة (ماذا فعلتَ أمس؟)، واستخدمي بطاقات صور لتكوين جمل كاملة والأناشيد ذات التكرار.", "Hold a daily circle-time sharing round, use picture cards to build full sentences, and use repetitive songs and rhymes."],
+    },
+    motor_g: {
+      baby: ["وفّري وقتاً يومياً على الأرض على البطن وبين الوسائد للتقلّب والزحف، مع ألعاب جذّابة على مسافة قريبة.", "Provide daily floor time (tummy time, rolling, crawling) with attractive toys just out of reach."],
+      toddler: ["جهّزي مسار حركة صغيراً (تسلّق وزحف ومشي على خط) ولعب الكرة يومياً في الساحة، وأمسكي بيد الطفل عند صعود الدرج.", "Set up a small movement course (climbing, crawling, line walking) and daily ball play outdoors; hold the child's hand on stairs."],
+      pre: ["أضيفي ألعاب القفز والتوازن وركوب الدراجة الصغيرة ورمي الكرة نحو هدف ضمن نشاط الحركة الصباحي.", "Add hopping, balancing, a small bike and throwing at a target to the morning movement activity."],
+    },
+    motor_f: {
+      baby: ["قدّمي أشياء آمنة للإمساك والهز، وألعاب الملمس المختلفة، وشجّعي الطفل على نقل الأشياء بين يديه.", "Offer safe objects to grasp and shake, varied textures, and encourage passing objects between hands."],
+      toddler: ["ضعي ركناً للصلصال والخرز الكبير وأحجام مختلفة من المكعبات والتلوين بالأصابع، وبدّلي الأنشطة كل أسبوع.", "Set up a corner with dough, large beads, blocks and finger painting, and rotate activities weekly."],
+      pre: ["درّبي الطفل على الإمساك الصحيح بالقلم عبر أنشطة التخريز والقص والتلوين داخل الحدود ولوحات الأزرار والسحّابات.", "Train pencil grip with threading, cutting, colouring within lines and button/zip boards."],
+    },
+    social: {
+      baby: ["احتضني الطفل وابتسمي وتواصلي بالعين أثناء الرعاية، وعرّفيه تدريجياً على الأطفال الآخرين.", "Cuddle, smile and make eye contact during care, and gradually introduce the baby to other children."],
+      toddler: ["نظّمي لعباً جماعياً قصيراً بأدوار بسيطة، وامدحي المشاركة والتبادل، وساعدي الطفل بالكلمات حين يتشاجر.", "Organise short group play with simple turn-taking, praise sharing, and give the child words during conflicts."],
+      pre: ["أشركي الطفل في مهام جماعية صغيرة (توزيع الأدوات) وألعاب التمثيل، وناقشي المشاعر بقصص ووجوه مشاعر مرسومة.", "Give small group jobs (handing out materials), role-play games, and discuss feelings with stories and emotion cards."],
+    },
+    cognitive: {
+      baby: ["حرّكي ألعاباً ملوّنة ببطء أمام الطفل وأخفيها وأظهريها، وقدّمي أشياء بأصوات وملامس مختلفة.", "Move bright toys slowly, hide and reveal them, and offer objects with different sounds and textures."],
+      toddler: ["وفّري ألغازاً بقطع كبيرة وصناديق تصنيف بالألوان والأشكال، وكرّري النشاط نفسه عدة أيام قبل زيادة الصعوبة.", "Provide big-piece puzzles and colour/shape sorting boxes; repeat the same activity for several days before raising difficulty."],
+      pre: ["استخدمي ألعاب المطابقة والذاكرة وعدّ الأشياء الحقيقية وبطاقات الحروف والأرقام، مع نشاط صغير لكل مهارة يومياً.", "Use matching and memory games, counting real objects, and letter/number cards — one short activity per skill daily."],
+    },
+    selfcare: {
+      baby: ["اتبعي روتيناً ثابتاً للأكل والنوم، واتركي الطفل يمسك الملعقة أو الكوب بمساعدتك.", "Keep a consistent feeding and nap routine and let the baby hold the spoon or cup with your help."],
+      toddler: ["خصّصي أوقاتاً ثابتة للحمام وغسل اليدين مع أغنية، وشجّعي الطفل على خلع الجوارب والحذاء بنفسه، وامدحي كل محاولة.", "Set fixed toilet and handwashing times with a song, encourage taking off socks/shoes alone, and praise every try."],
+      pre: ["اجعلي الاستقلالية جزءاً من الروتين: ارتداء المعطف، ترتيب الحقيبة، غسل اليدين، مع لوحة صور تُرتّب الخطوات وإعطاء وقت كافٍ.", "Build independence into routines — coat, bag, handwashing — with a picture-step chart and plenty of time."],
+    },
+  },
+};
+
+// Home advice for parents on a skill rated 1-2 ("" for higher levels).
+export function parentTip({ skillId, level, gender, lang }) {
+  return tipFor("parent", { skillId, level, gender, lang });
+}
+// Classroom advice for staff on a skill rated 1-2.
+export function staffTip({ skillId, level, gender, lang }) {
+  return tipFor("staff", { skillId, level, gender, lang });
+}
+function tipFor(who, { skillId, level, gender, lang }) {
+  const sk = skillById(skillId);
+  if (!sk || !level || level > 2) return "";
+  const pair = ACTIVITIES[who]?.[sk.domain]?.[groupOf(sk.band)];
+  if (!pair) return "";
+  return gen(pair[lang === "en" ? 1 : 0], gender);
 }
 
 // message for a skill at a mastery level, in "ar" | "en"
@@ -148,8 +216,7 @@ export function messageFor({ skillId, level, name, gender, lang }) {
   if (!sk || !level) return "";
   const l = lang === "en" ? "en" : "ar";
   const nm = (name || "").trim().split(" ")[0] || (l === "ar" ? "الطفل" : "Your child");
-  const tip = level <= 2 ? gen(TIPS[l][sk.domain] || "", gender) : "";
-  const text = TPL[l][level].replace("{s}", sk[l]).replace("{n}", nm).replace("{tip}", tip);
+  const text = TPL[l][level].replace("{s}", sk[l]).replace("{n}", nm);
   return gen(text, gender).replace(/\s+$/g, "");
 }
 

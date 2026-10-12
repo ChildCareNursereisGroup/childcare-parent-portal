@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import { BranchLogin, BranchAdminScreen } from "./BranchAdmin";
-import { DOMAINS, LEVELS, AGE_BANDS, messageFor, skillById, domainAverage } from "./devBank";
+import { DOMAINS, LEVELS, AGE_BANDS, messageFor, parentTip, skillById, domainAverage } from "./devBank";
 import { generateFormPdfBlob } from "./lib/pdfExport";
 import { TERMS, CONSENTS, TERMS_VERSION } from "./terms";
 
@@ -732,6 +732,11 @@ function ReportsScreen({ registrationId }) {
                   <div key={id} className="rounded-xl p-2.5" style={{ background: `${colorOf(lv)}14`, borderRight: `3px solid ${colorOf(lv)}` }}>
                     <p className="text-[11px] font-bold mb-0.5" style={{ color: colorOf(lv) }}>{tr(sk.ar, sk.en)}</p>
                     <p className="text-xs text-slate-600 leading-relaxed">{messageFor({ skillId: id, level: lv, name: child?.name, gender: child?.gender, lang })}</p>
+                    {lv <= 2 && (
+                      <p className="text-xs text-emerald-800 leading-relaxed bg-emerald-50 border border-emerald-100 rounded-lg p-2 mt-1.5">
+                        <b>{tr("💡 نصيحة للأهل: ", "💡 Tip for parents: ")}</b>{parentTip({ skillId: id, level: lv, gender: child?.gender, lang })}
+                      </p>
+                    )}
                   </div>
                 );
               })}
@@ -993,29 +998,35 @@ function RegisterForm({ onBack, showToast, standalone }) {
     }
 
     let fullFormPath = null;
+    let fullFormEnPath = null;
     try {
-      const pdfBlob = await generateFormPdfBlob({
+      const pdfArgs = {
         f: formData,
         branch: selectedBranch || null,
         billing: {
           recurring_fee: recurringFee,
           one_time_fee: null,
-          planLabel: selectedPlan?.label.ar || "",
-          transportLabel: selectedTransport?.label.ar || "",
-          weekendLabels: selectedWeekendDays.map((d) => d.label.ar),
+          planLabel: selectedPlan ? { ar: selectedPlan.label.ar, en: selectedPlan.label.en } : null,
+          transportLabel: selectedTransport ? { ar: selectedTransport.label.ar, en: selectedTransport.label.en } : null,
+          weekendLabels: selectedWeekendDays.map((d) => ({ ar: d.label.ar, en: d.label.en })),
         },
         signatureDataUrl: f.signatureDataUrl || null,
         attached: [
-          files.fatherId?.status === "done" && "هوية الأب",
-          files.motherId?.status === "done" && "هوية الأم",
-          files.childId?.status === "done" && "هوية/شهادة ميلاد الطفل",
-          files.childPhoto?.status === "done" && "صورة الطفل",
-          files.vaxCard?.status === "done" ? "كارت التطعيمات" : f.vaxPledge ? "تعهد بتقديم كارت التطعيمات لاحقاً" : false,
+          files.fatherId?.status === "done" && { ar: "هوية الأب", en: "Father's ID" },
+          files.motherId?.status === "done" && { ar: "هوية الأم", en: "Mother's ID" },
+          files.childId?.status === "done" && { ar: "هوية/شهادة ميلاد الطفل", en: "Child's ID / birth certificate" },
+          files.childPhoto?.status === "done" && { ar: "صورة الطفل", en: "Child's photo" },
+          files.vaxCard?.status === "done" ? { ar: "كارت التطعيمات", en: "Vaccination card" } : f.vaxPledge ? { ar: "تعهد بتقديم كارت التطعيمات لاحقاً", en: "Pledge to provide the vaccination card later" } : false,
         ].filter(Boolean),
-      });
-      const pdfPath = `${regId}/full-form-${Date.now()}.pdf`;
-      const { error: pdfErr } = await supabase.storage.from("registration-documents").upload(pdfPath, pdfBlob, { contentType: "application/pdf" });
-      if (!pdfErr) fullFormPath = pdfPath;
+      };
+      // Everyone (parents + management) gets the form in both Arabic and English.
+      const up = async (blob, name) => {
+        const path = `${regId}/${name}-${Date.now()}.pdf`;
+        const { error: e } = await supabase.storage.from("registration-documents").upload(path, blob, { contentType: "application/pdf" });
+        return e ? null : path;
+      };
+      fullFormPath = await up(await generateFormPdfBlob({ ...pdfArgs, lang: "ar" }), "full-form");
+      fullFormEnPath = await up(await generateFormPdfBlob({ ...pdfArgs, lang: "en" }), "full-form-en");
     } catch (_e) {
       fullFormPath = null;
     }
@@ -1033,6 +1044,7 @@ function RegisterForm({ onBack, showToast, standalone }) {
         vaccination_card: files.vaxCard?.path || null,
         vaccination_pledge: !!f.vaxPledge,
         full_form_pdf: fullFormPath,
+        full_form_pdf_en: fullFormEnPath,
         signature: signaturePath,
         billing: {
           frequency: freq,

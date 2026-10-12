@@ -102,8 +102,9 @@ Deno.serve(async (req) => {
     const fee = billing ? `${billing.recurring_fee} د.إ (${freqAr}) + ${oneTime}${promo}` : "-";
 
     const docs = record.documents || {};
-    const [fullFormAttachment, signatureAttachment, fatherIdAttachment, motherIdAttachment, childIdAttachment, childPhotoAttachment, vaxCardAttachment] = await Promise.all([
-      fetchAttachment(admin, docs.full_form_pdf, "استمارة-التسجيل-كاملة.pdf"),
+    const [fullFormAttachment, fullFormEnAttachment, signatureAttachment, fatherIdAttachment, motherIdAttachment, childIdAttachment, childPhotoAttachment, vaxCardAttachment] = await Promise.all([
+      fetchAttachment(admin, docs.full_form_pdf, "استمارة-التسجيل-عربي.pdf"),
+      fetchAttachment(admin, docs.full_form_pdf_en, "Registration-Form-English.pdf"),
       fetchAttachment(admin, docs.signature, "توقيع-ولي-الأمر.png"),
       fetchAttachment(admin, docs.father_id, "هوية-الأب.jpg"),
       fetchAttachment(admin, docs.mother_id, "هوية-الأم.jpg"),
@@ -111,7 +112,12 @@ Deno.serve(async (req) => {
       fetchAttachment(admin, docs.child_photo, "صورة-الطفل.jpg"),
       fetchAttachment(admin, docs.vaccination_card, "كارت-التطعيمات.jpg"),
     ]);
-    const attachments = [fullFormAttachment, signatureAttachment, fatherIdAttachment, motherIdAttachment, childIdAttachment, childPhotoAttachment, vaxCardAttachment].filter(Boolean);
+    const lang = record.form_data?.consentLang === "en" ? "en" : "ar";
+    const rest = [signatureAttachment, fatherIdAttachment, motherIdAttachment, childIdAttachment, childPhotoAttachment, vaxCardAttachment];
+    // Management and the parent both get the form in Arabic AND English.
+    const allAttachments = [fullFormAttachment, fullFormEnAttachment, ...rest].filter(Boolean);
+    const adminAttachments = allAttachments;
+    const parentAttachments = allAttachments;
 
     const signatureImg = signatureAttachment
       ? `<div style="margin-top:14px;"><p><b>توقيع ولي الأمر:</b></p><img src="data:image/png;base64,${signatureAttachment.content}" alt="التوقيع" style="max-width:280px;border:1px solid #e2e8f0;border-radius:8px;padding:6px;background:#fff;" /></div>`
@@ -127,15 +133,33 @@ Deno.serve(async (req) => {
         ${renderFormSummary(record.form_data || {})}
         ${signatureImg}
         <hr style="border:none;border-top:1px solid #e2e8f0;" />
-        <p>استمارة التسجيل كاملة (PDF) موقّعة، بالإضافة للمستندات المرفوعة، مرفقين بهذا الإيميل.</p>
+        <p>استمارة التسجيل كاملة وموقّعة (PDF) بنسختين عربي وإنجليزي، بالإضافة للمستندات المرفوعة، مرفقين بهذا الإيميل.</p>
       </div>
     `;
 
-    const adminSent = await sendEmail(resendKey, notifyEmail, `طلب تسجيل جديد - ${branch}`, html, attachments);
+    const adminSent = await sendEmail(resendKey, notifyEmail, `طلب تسجيل جديد - ${branch}`, html, adminAttachments);
 
     let parentSent = false;
     if (record.contact_email) {
-      parentSent = await sendEmail(resendKey, record.contact_email, "نسخة من استمارة تسجيل طفلك", html, attachments);
+      if (lang === "en") {
+        const BR: Record<string, string> = { farha: "Al Farha – Al Qasimia", saada: "Al Saada – Al Shargan", dolphin: "Dolphin – Samnan", saadakids: "Al Saada for Kids", abtal: "Abtal Al Baraiem" };
+        const freqEn = billing ? ({ monthly: "monthly", weekly: "weekly", daily: "daily" } as Record<string, string>)[billing.frequency] || billing.frequency : "";
+        const feeEn = billing
+          ? `AED ${billing.recurring_fee} (${freqEn}) + registration, medical, stationery & uniform fees (set by management)${billing.promo_code ? ` — discount code: ${billing.promo_code}` : ""}`
+          : "-";
+        const htmlEn = `
+          <div dir="ltr" style="font-family: sans-serif; line-height: 1.8; max-width:600px;">
+            <h2>Your child's registration form</h2>
+            <p>Thank you for registering <b>${esc(record.form_data?.name || "your child")}</b> at Child Care Nurseries Group — <b>${esc(BR[record.branch] || branch)}</b>.</p>
+            <p>Signed copies of the registration form (PDF, in Arabic and English) and the documents you uploaded are attached to this email.</p>
+            <p><b>Fees:</b> ${esc(feeEn)}</p>
+            <p>Our team will review your application and contact you shortly. You'll receive a login link once it is approved.</p>
+            <p style="color:#94a3b8;font-size:12px;">Child Care Nurseries Group</p>
+          </div>`;
+        parentSent = await sendEmail(resendKey, record.contact_email, "A copy of your child's registration form", htmlEn, parentAttachments);
+      } else {
+        parentSent = await sendEmail(resendKey, record.contact_email, "نسخة من استمارة تسجيل طفلك", html, parentAttachments);
+      }
     }
 
     return new Response(JSON.stringify({ ok: true, admin_sent: adminSent, parent_sent: parentSent, error: lastResendError || undefined }), {
