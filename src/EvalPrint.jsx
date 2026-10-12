@@ -91,10 +91,11 @@ export function buildReportBlocks(report, branchLabel) {
   return blocks;
 }
 
-export function ReportPage({ lang, children }) {
+export function ReportPage({ lang, children, footer }) {
   return (
-    <div dir={lang === "en" ? "ltr" : "rtl"} style={{ width: REPORT_PAGE_W, height: REPORT_PAGE_H, padding: REPORT_PAD, boxSizing: "border-box", background: "#fff", fontFamily: "Tajawal, Arial, sans-serif", color: "#0f172a", overflow: "hidden" }}>
+    <div dir={lang === "en" ? "ltr" : "rtl"} style={{ width: REPORT_PAGE_W, height: REPORT_PAGE_H, padding: REPORT_PAD, boxSizing: "border-box", position: "relative", background: "#fff", fontFamily: "Tajawal, Arial, sans-serif", color: "#0f172a", overflow: "hidden" }}>
       {children}
+      {footer && <div style={{ position: "absolute", bottom: 14, left: 0, right: 0, textAlign: "center", fontSize: 11.5, color: "#94a3b8" }}>{footer}</div>}
     </div>
   );
 }

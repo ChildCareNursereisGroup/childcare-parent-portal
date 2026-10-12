@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { buildFormBlocks, PageShell, PAGE_W, PAGE_H, PAD_X, SLIM_H, FOOT_H } from "../FormPrint";
+import { buildBranchReportBlocks, buildChildProgressBlocks } from "../ProgressPrint";
 import { buildReportBlocks, buildPlanBlocks, ReportPage, REPORT_PAGE_W, REPORT_PAGE_H, REPORT_PAD } from "../EvalPrint";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -127,10 +128,28 @@ export function generatePlanPdfBlob({ plan, branchLabel }) {
   return blocksToPdfBlob(buildPlanBlocks(plan, branchLabel), plan.lang === "en" ? "en" : "ar");
 }
 
-async function blocksToPdfBlob(blocks, lang) {
+// Manager-facing month-to-month progress reports.
+export function generateBranchProgressPdfBlob({ summary, month, lang, branchLabel, classNameById }) {
+  return blocksToPdfBlob(buildBranchReportBlocks({ summary, month, lang, branchLabel, classNameById }), lang, branchLabel);
+}
+export function generateChildProgressPdfBlob({ p, f, lang, branchLabel }) {
+  return blocksToPdfBlob(buildChildProgressBlocks({ p, f, lang, branchLabel }), lang, branchLabel);
+}
+// Support plans of many children in one file; each child starts on a new page.
+export function generateAllPlansPdfBlob({ plans, lang, branchLabel, emptyText }) {
+  const blocks = [];
+  plans.forEach((plan, i) => {
+    buildPlanBlocks(plan, branchLabel).forEach((b, j) => blocks.push({ ...b, key: `p${i}-${b.key}`, breakBefore: i > 0 && j === 0 }));
+  });
+  if (blocks.length === 0) blocks.push({ key: "none", el: <div style={{ fontSize: 18, padding: 20 }}>{emptyText}</div> });
+  return blocksToPdfBlob(blocks, lang, branchLabel);
+}
+
+async function blocksToPdfBlob(blocks, lang, footerLabel = "") {
   const GAP = 12;
+  const FOOT = 22;
   const contentW = REPORT_PAGE_W - REPORT_PAD * 2;
-  const availH = REPORT_PAGE_H - REPORT_PAD * 2;
+  const availH = REPORT_PAGE_H - REPORT_PAD * 2 - FOOT;
 
   const measure = hiddenContainer();
   const mroot = createRoot(measure);
@@ -147,7 +166,7 @@ async function blocksToPdfBlob(blocks, lang) {
   const pages = [[]];
   let used = 0;
   blocks.forEach((b, i) => {
-    if (used + heights[i] > availH && pages[pages.length - 1].length > 0) { pages.push([]); used = 0; }
+    if ((b.breakBefore || used + heights[i] > availH) && pages[pages.length - 1].length > 0) { pages.push([]); used = 0; }
     pages[pages.length - 1].push(b);
     used += heights[i];
   });
@@ -159,7 +178,7 @@ async function blocksToPdfBlob(blocks, lang) {
     const holder = hiddenContainer();
     const root = createRoot(holder);
     root.render(
-      <ReportPage lang={lang}>
+      <ReportPage lang={lang} footer={`${footerLabel ? footerLabel + "  ·  " : ""}${lang === "en" ? "Page" : "صفحة"} ${p + 1} ${lang === "en" ? "of" : "من"} ${pages.length}`}>
         {pages[p].map((b) => (<div key={b.key} style={{ paddingBottom: GAP }}>{b.el}</div>))}
       </ReportPage>
     );

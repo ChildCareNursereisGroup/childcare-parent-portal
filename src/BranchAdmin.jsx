@@ -5,6 +5,8 @@ import {
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import { generateReportPdfBlob, generatePlanPdfBlob } from "./lib/pdfExport";
+import { BranchReportScreen, ChildProgressSection, downloadBlob } from "./BranchProgress";
+import { buildPlan } from "./progress";
 import { DOMAINS, AGE_BANDS, LEVELS, skillsFor, messageFor, parentTip, staffTip, bandForMonths, ageInMonths } from "./devBank";
 
 export { DOMAINS };
@@ -222,27 +224,10 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
     const en = L2 === "en";
     setPlanBusy(L2);
     try {
-      const order = [...lowSkills].sort((x, y) => ratings[x.id] - ratings[y.id]);
-      const plan = {
-        lang: L2,
-        childName: (f.name || "").trim(),
-        monthLabel: (() => { const [y, m] = month.split("-").map(Number); return en ? `${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][m - 1]} ${y}` : `${AR_MONTHS[m - 1]} ${y}`; })(),
-        bandLabel: (() => { const bd = AGE_BANDS.find((x) => x.id === band); return bd ? (en ? bd.en : bd.ar) : ""; })(),
-        teacher: teacherName,
-        items: order.map((x) => {
-          const Lv = LEVELS.find((v) => v.v === ratings[x.id]);
-          return { domain: en ? x.domainEn : x.domainAr, skill: en ? x.en : x.ar, level: Lv.v, levelLabel: en ? Lv.en : Lv.ar, color: Lv.color,
-            staffTip: staffTip({ skillId: x.id, level: Lv.v, gender: f.gender, lang: L2 }), parentTip: parentTip({ skillId: x.id, level: Lv.v, gender: f.gender, lang: L2 }) };
-        }),
-      };
+      const plan = buildPlan({ f, ratings, band, teacherName, month, lang: L2 });
       const BR = BRANCH_LABELS[reg.branch];
       const blob = await generatePlanPdfBlob({ plan, branchLabel: BR ? BR[L2] : "" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Support-Plan-${(f.name || "child").trim().replace(/\s+/g, "-")}-${month}-${en ? "EN" : "AR"}.pdf`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      downloadBlob(blob, `Support-Plan-${(f.name || "child").trim().replace(/\s+/g, "-")}-${month}-${en ? "EN" : "AR"}.pdf`);
     } catch (_e) {
       showToast(tr("حصل خطأ في عمل الملف", "Could not create the PDF"));
     }
@@ -459,6 +444,8 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
         className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mt-3 bg-white text-slate-800" />
       <textarea value={generalNote} onChange={(e) => setGeneralNote(e.target.value)} placeholder={tr("ملاحظة عامة للأهل (اختياري)", "General note to parents (optional)")} rows={2}
         className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mt-2 bg-white text-slate-800" />
+
+      <ChildProgressSection tr={tr} reg={reg} evaluations={evaluations} month={month} branchLabel={BRANCH_LABELS[reg.branch]} showToast={showToast} />
 
       {confirmSend && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3 space-y-2 text-right">
@@ -758,6 +745,7 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [onlyPending, setOnlyPending] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -816,6 +804,9 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+        <button type="button" onClick={() => setShowReport(true)} className="w-full bg-sky-600 text-white font-bold rounded-xl px-3 py-2.5 text-xs">
+          {tr("📊 تقرير نمو الفرع الشهري (مقارنة الشهور + خطط الدعم)", "📊 Branch monthly progress report (month comparison + support plans)")}
+        </button>
         {loading && <p className="text-xs text-slate-400 text-center">{tr("جارِ التحميل...", "Loading...")}</p>}
         {pendingCount > 0 && (
           <button type="button" onClick={() => setOnlyPending((v) => !v)}
@@ -838,6 +829,10 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
           </button>
         ))}
       </div>
+
+      {showReport && (
+        <BranchReportScreen tr={tr} session={session} regs={regs} classes={classes} branchLabel={BRANCH_LABELS[session.branch] || { ar: session.branch, en: session.branch }} onClose={() => setShowReport(false)} showToast={showToast} />
+      )}
 
       {selectedReg && (
         <ChildDetail

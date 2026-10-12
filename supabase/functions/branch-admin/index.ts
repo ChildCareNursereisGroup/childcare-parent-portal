@@ -469,6 +469,20 @@ Deno.serve(async (req) => {
       return json({ ok: true, sent_to: sent, failed, attached: attachments.length > 0 });
     }
 
+    // All monthly evaluations of the branch (for month-to-month progress reports).
+    if (action === "list_branch_evaluations") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      const { data, error } = await admin
+        .from("monthly_evaluations")
+        .select("registration_id, month, age_band, ratings, teacher_name, flags")
+        .eq("branch", branch)
+        .order("month", { ascending: true })
+        .limit(5000);
+      if (error) return json({ error: error.message }, 500);
+      return json({ evaluations: data || [] });
+    }
+
     if (action === "list_evaluations") {
       const branch = await requireBranchSession(body.token);
       if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
