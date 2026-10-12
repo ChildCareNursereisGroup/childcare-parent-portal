@@ -7,6 +7,7 @@ import { supabase } from "./lib/supabaseClient";
 import { generateReportPdfBlob, generatePlanPdfBlob } from "./lib/pdfExport";
 import { BranchReportScreen, ChildProgressSection, downloadBlob } from "./BranchProgress";
 import { buildPlan } from "./progress";
+import { PartnershipScreen } from "./BranchFeedback";
 import { DOMAINS, AGE_BANDS, LEVELS, skillsFor, messageFor, parentTip, staffTip, bandForMonths, ageInMonths } from "./devBank";
 
 export { DOMAINS };
@@ -746,6 +747,7 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
   const [selected, setSelected] = useState(null);
   const [onlyPending, setOnlyPending] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showPartner, setShowPartner] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -807,6 +809,9 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
         <button type="button" onClick={() => setShowReport(true)} className="w-full bg-sky-600 text-white font-bold rounded-xl px-3 py-2.5 text-xs">
           {tr("📊 تقرير نمو الفرع الشهري (مقارنة الشهور + خطط الدعم)", "📊 Branch monthly progress report (month comparison + support plans)")}
         </button>
+        <button type="button" onClick={() => setShowPartner(true)} className="w-full bg-teal-600 text-white font-bold rounded-xl px-3 py-2.5 text-xs">
+          {tr("🤝 شراكة الأهل (شكاوى + استبيان + تقرير شهري)", "🤝 Parent partnership (complaints + survey + monthly report)")}
+        </button>
         {loading && <p className="text-xs text-slate-400 text-center">{tr("جارِ التحميل...", "Loading...")}</p>}
         {pendingCount > 0 && (
           <button type="button" onClick={() => setOnlyPending((v) => !v)}
@@ -829,6 +834,10 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
           </button>
         ))}
       </div>
+
+      {showPartner && (
+        <PartnershipScreen tr={tr} session={session} regs={regs} branchLabel={BRANCH_LABELS[session.branch] || { ar: session.branch, en: session.branch }} onClose={() => setShowPartner(false)} showToast={showToast} />
+      )}
 
       {showReport && (
         <BranchReportScreen tr={tr} session={session} regs={regs} classes={classes} branchLabel={BRANCH_LABELS[session.branch] || { ar: session.branch, en: session.branch }} onClose={() => setShowReport(false)} showToast={showToast} />

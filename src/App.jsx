@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import { BranchLogin, BranchAdminScreen } from "./BranchAdmin";
+import { SurveyBanner, SurveyScreen, FeedbackScreen as ParentFeedbackScreen } from "./ParentFeedback";
 import { DOMAINS, LEVELS, AGE_BANDS, messageFor, parentTip, skillById, domainAverage } from "./devBank";
 import { generateFormPdfBlob } from "./lib/pdfExport";
 import { TERMS, CONSENTS, TERMS_VERSION } from "./terms";
@@ -1546,7 +1547,8 @@ function MoreMenu({ setMoreView }) {
   const items = [
     { key: "register", label: tr("تسجيل طفل إضافي (أخ/أخت)", "Register another child (sibling)"), icon: FileText, color: "text-sky-500" },
     { key: "documents", label: tr("المستندات المطلوبة", "Required documents"), icon: Upload, color: "text-teal-500" },
-    { key: "complaints", label: tr("الشكاوى والاستفسارات", "Complaints & inquiries"), icon: MessageCircle, color: "text-rose-500" },
+    { key: "survey", label: tr("استبيان الأهل (رأيك يهمنا)", "Parent survey"), icon: ClipboardList, color: "text-sky-500" },
+    { key: "complaints", label: tr("الشكاوى والاقتراحات", "Complaints & suggestions"), icon: MessageCircle, color: "text-rose-500" },
     { key: "branch", label: tr("معلومات الفرع", "Branch info"), icon: Building2, color: "text-purple-500" },
   ];
   return (
@@ -1800,7 +1802,8 @@ export default function ParentPortalPrototype() {
   const titles = {
     register: tr("استمارة تسجيل الطفل", "Child Registration Form"),
     documents: tr("المستندات المطلوبة", "Required Documents"),
-    complaints: tr("الشكاوى والاستفسارات", "Complaints & Inquiries"),
+    survey: tr("استبيان الأهل", "Parent survey"),
+    complaints: tr("الشكاوى والاقتراحات", "Complaints & Suggestions"),
     branch: tr("معلومات الفرع", "Branch Info"),
   };
 
@@ -1849,6 +1852,8 @@ export default function ParentPortalPrototype() {
                 </button>
               </div>
 
+              {activeTab === "home" && <SurveyBanner tr={tr} lang={lang} onOpen={() => { setActiveTab("more"); setMoreView("survey"); }} />}
+
               <div className="flex-1 overflow-hidden">
                 {activeTab === "home" && <HomeScreen setActiveTab={setActiveTab} setMoreView={setMoreView} goBranch={() => { setActiveTab("more"); setMoreView("branch"); }} />}
                 {activeTab === "schedule" && <ScheduleScreen showToast={showToast} />}
@@ -1861,7 +1866,8 @@ export default function ParentPortalPrototype() {
                     <TopBar title={titles[moreView]} onBack={() => setMoreView(null)} />
                     <div className="flex-1 overflow-hidden">
                       {moreView === "documents" && <DocumentsScreen showToast={showToast} />}
-                      {moreView === "complaints" && <ComplaintsScreen showToast={showToast} />}
+                      {moreView === "survey" && <SurveyScreen tr={tr} lang={lang} showToast={showToast} />}
+                      {moreView === "complaints" && <ParentFeedbackScreen tr={tr} lang={lang} showToast={showToast} />}
                       {moreView === "branch" && <BranchScreen />}
                     </div>
                   </div>

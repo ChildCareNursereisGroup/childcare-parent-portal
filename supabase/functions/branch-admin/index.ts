@@ -405,10 +405,12 @@ Deno.serve(async (req) => {
       const T = en
         ? { dir: "ltr", side: "left", group: "Child Care Nurseries Group", title: (n: string) => `🌱 ${n}'s Development Report`, stage: "Stage", teacher: "Teacher", dear: "Dear parent,", note: "Note from the teacher:", tip: "💡 Tip for parents:",
             outro: (pdf: boolean) => `${pdf ? "PDF copies of the report (Arabic and English) are attached. " : ""}Thank you for trusting us 💛 — we're always happy to hear from you.`,
-            subject: (n: string, m: string) => `🌱 ${n}'s development report — ${m}` }
+            subject: (n: string, m: string) => `🌱 ${n}'s development report — ${m}`,
+            survey: "💬 Your opinion matters: please take our 5-minute quarterly parent survey in the Parent Portal (menu \"More\" → Parent survey)." }
         : { dir: "rtl", side: "right", group: "مجموعة رعاية الطفل للحضانات", title: (n: string) => `🌱 تقرير نمو ${n}`, stage: "المرحلة", teacher: "المعلمة", dear: "عزيزي ولي الأمر،", note: "ملاحظة من المعلمة:", tip: "💡 نصيحة للأهل:",
             outro: (pdf: boolean) => `${pdf ? "نسختان PDF من التقرير (عربي وإنجليزي) مرفقتان بهذا الإيميل. " : ""}شكراً لثقتكم بنا 💛 ونسعد دائماً بالتواصل معكم لأي استفسار.`,
-            subject: (n: string, m: string) => `🌱 تقرير نمو ${n} — ${m}` };
+            subject: (n: string, m: string) => `🌱 تقرير نمو ${n} — ${m}`,
+            survey: "💬 رأيك يهمنا: شاركينا في استبيان الأهل ربع السنوي (5 دقائق) من بوابة أولياء الأمور — قائمة «المزيد» ← «استبيان الأهل»." };
 
       const domainsHtml = (report.domains as any[]).map((d) => {
         const stars = "★".repeat(d.avg || 0) + `<span style="color:#e2e8f0">${"★".repeat(5 - (d.avg || 0))}</span>`;
@@ -433,6 +435,7 @@ Deno.serve(async (req) => {
         ${domainsHtml}
         ${report.note ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 14px;font-size:15px;"><b>${T.note}</b> ${esc(report.note)}</div>` : ""}
         <p style="font-size:15px;margin-top:16px;">${T.outro(attachments.length > 0)}</p>
+        ${["03", "06", "09", "12"].includes(String(month).slice(5, 7)) ? `<p style="font-size:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:10px 14px;">${T.survey}<br/><a href="https://childcarenursereisgroup.github.io/childcare-parent-portal/">childcarenursereisgroup.github.io/childcare-parent-portal</a></p>` : ""}
         <p style="font-size:12px;color:#94a3b8;">${T.group}</p>
       </div>`;
 
@@ -475,12 +478,120 @@ Deno.serve(async (req) => {
       if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
       const { data, error } = await admin
         .from("monthly_evaluations")
-        .select("registration_id, month, age_band, ratings, teacher_name, flags")
+        .select("registration_id, month, age_band, ratings, teacher_name, flags, sent_at")
         .eq("branch", branch)
         .order("month", { ascending: true })
         .limit(5000);
       if (error) return json({ error: error.message }, 500);
       return json({ evaluations: data || [] });
+    }
+
+    // ---- Parent partnership: complaints log + survey data + monthly note ----
+    if (action === "list_feedback") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      const [{ data: cases, error: cErr }, { data: surveys, error: sErr }, { data: notes }] = await Promise.all([
+        admin.from("feedback_cases").select("*").eq("branch", branch).order("received_at", { ascending: false }).limit(2000),
+        admin.from("parent_surveys").select("registration_id, period, answers, nps, positive, improve, anonymous, created_at").eq("branch", branch).order("created_at", { ascending: false }).limit(5000),
+        admin.from("partnership_notes").select("month, you_said_we_did").eq("branch", branch),
+      ]);
+      if (cErr || sErr) return json({ error: (cErr || sErr)!.message }, 500);
+      return json({ cases: cases || [], surveys: surveys || [], notes: notes || [] });
+    }
+
+    if (action === "save_case") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      const KINDS = ["complaint", "suggestion", "compliment"];
+      const CATS = ["care", "health", "safety", "communication", "fees", "staff", "protection", "facilities", "learning", "other"];
+      const STATUSES = ["new", "review", "action", "resolved"];
+      const SOURCES = ["portal", "phone", "whatsapp", "in_person", "other"];
+      const now = new Date().toISOString();
+      const txt = (v: unknown, n: number) => (v === undefined || v === null ? undefined : String(v).trim().slice(0, n));
+
+      if (!body.id) {
+        // logged by staff (phone / WhatsApp / in person)
+        let regRow: any = null;
+        if (body.registration_id) {
+          const { data } = await admin.from("portal_registrations").select("id, parent_user_id, contact_email, form_data").eq("id", body.registration_id).eq("branch", branch).single();
+          regRow = data;
+        }
+        const subject = txt(body.subject, 160);
+        if (!subject) return json({ error: "اكتبي عنوان الملاحظة" }, 400);
+        const category = CATS.includes(body.category) ? body.category : "other";
+        const { data: row, error } = await admin.from("feedback_cases").insert({
+          branch,
+          registration_id: regRow?.id || null,
+          parent_user_id: regRow?.parent_user_id || null,
+          parent_name: txt(body.parent_name, 120) || regRow?.form_data?.fName || null,
+          contact: txt(body.contact, 120) || regRow?.contact_email || null,
+          child_name: txt(body.child_name, 120) || regRow?.form_data?.name || null,
+          source: SOURCES.includes(body.source) ? body.source : "phone",
+          kind: KINDS.includes(body.kind) ? body.kind : "complaint",
+          category,
+          subject,
+          description: txt(body.description, 3000) || null,
+          sensitive: !!body.sensitive || category === "staff" || category === "protection",
+          status: "review",
+          acknowledged_at: now,
+          created_by: "staff",
+        }).select("*").single();
+        if (error) return json({ error: error.message }, 500);
+        return json({ ok: true, case: row });
+      }
+
+      const { data: cur, error: curErr } = await admin.from("feedback_cases").select("*").eq("id", body.id).eq("branch", branch).single();
+      if (curErr || !cur) return json({ error: "غير موجود" }, 404);
+      const upd: Record<string, unknown> = { updated_at: now };
+      if (CATS.includes(body.category)) { upd.category = body.category; if (body.category === "staff" || body.category === "protection") upd.sensitive = true; }
+      if (KINDS.includes(body.kind)) upd.kind = body.kind;
+      if (body.sensitive !== undefined) upd.sensitive = !!body.sensitive || upd.sensitive === true;
+      if (body.action_taken !== undefined) upd.action_taken = txt(body.action_taken, 3000) || null;
+      if (body.parent_satisfied !== undefined) upd.parent_satisfied = body.parent_satisfied === null ? null : !!body.parent_satisfied;
+      if (STATUSES.includes(body.status)) {
+        upd.status = body.status;
+        if (body.status !== "new" && !cur.acknowledged_at) upd.acknowledged_at = now;
+        if (body.status === "resolved") { if (!cur.resolved_at) upd.resolved_at = now; } else upd.resolved_at = null;
+      }
+      const { data: row, error } = await admin.from("feedback_cases").update(upd).eq("id", body.id).select("*").single();
+      if (error) return json({ error: error.message }, 500);
+
+      // tell the parent once, when the case becomes resolved
+      let notified = false;
+      if (upd.status === "resolved" && cur.status !== "resolved" && cur.contact && /^\S+@\S+\.\S+$/.test(cur.contact) && resendKey) {
+        let en = false;
+        if (cur.registration_id) {
+          const { data: rr } = await admin.from("portal_registrations").select("form_data").eq("id", cur.registration_id).single();
+          en = rr?.form_data?.consentLang === "en";
+        }
+        const esc2 = (v: unknown) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] || c));
+        const detail = row.sensitive ? "" : (row.action_taken || "");
+        const html = en
+          ? `<div dir="ltr" style="font-family:sans-serif;line-height:1.8;max-width:560px;"><h2>Your feedback has been resolved</h2><p>Reference: <b>${esc2(row.ref)}</b></p>${detail ? `<p style="background:#f0fdf4;border-radius:8px;padding:10px;white-space:pre-wrap;">${esc2(detail)}</p>` : ""}<p>Thank you for helping us improve. If you are not satisfied, please reply or contact the branch.</p><p style="color:#94a3b8;font-size:12px;">Child Care Nurseries Group</p></div>`
+          : `<div dir="rtl" style="font-family:sans-serif;line-height:1.9;max-width:560px;"><h2>تم حل ملاحظتك</h2><p>الرقم المرجعي: <b>${esc2(row.ref)}</b></p>${detail ? `<p style="background:#f0fdf4;border-radius:8px;padding:10px;white-space:pre-wrap;">${esc2(detail)}</p>` : ""}<p>شكراً لمساعدتك لنا على التحسّن. لو لسه مش راضية عن النتيجة، تواصلي مع الفرع.</p><p style="color:#94a3b8;font-size:12px;">مجموعة رعاية الطفل للحضانات</p></div>`;
+        try {
+          const res = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ from: "مجموعة رعاية الطفل للحضانات <login@childcareuae.com>", to: cur.contact, subject: en ? `Your feedback is resolved — ${row.ref}` : `تم حل ملاحظتك — ${row.ref}`, html }),
+          });
+          notified = res.ok;
+        } catch (_e) { notified = false; }
+      }
+      return json({ ok: true, case: row, notified });
+    }
+
+    if (action === "save_note") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      const month = String(body.month || "");
+      if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: "شهر غير صحيح" }, 400);
+      const { error } = await admin.from("partnership_notes").upsert(
+        { branch, month, you_said_we_did: String(body.you_said_we_did || "").slice(0, 4000), updated_at: new Date().toISOString() },
+        { onConflict: "branch,month" }
+      );
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true });
     }
 
     if (action === "list_evaluations") {

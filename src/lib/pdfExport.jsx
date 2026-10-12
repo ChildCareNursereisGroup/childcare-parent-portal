@@ -3,6 +3,7 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { buildFormBlocks, PageShell, PAGE_W, PAGE_H, PAD_X, SLIM_H, FOOT_H } from "../FormPrint";
 import { buildBranchReportBlocks, buildChildProgressBlocks } from "../ProgressPrint";
+import { buildPartnershipBlocks } from "../PartnershipPrint";
 import { buildReportBlocks, buildPlanBlocks, ReportPage, REPORT_PAGE_W, REPORT_PAGE_H, REPORT_PAD } from "../EvalPrint";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -134,6 +135,10 @@ export function generateBranchProgressPdfBlob({ summary, month, lang, branchLabe
 }
 export function generateChildProgressPdfBlob({ p, f, lang, branchLabel }) {
   return blocksToPdfBlob(buildChildProgressBlocks({ p, f, lang, branchLabel }), lang, branchLabel);
+}
+// Parent partnership report (survey + complaints + communication KPIs).
+export function generatePartnershipPdfBlob({ data, lang, branchLabel }) {
+  return blocksToPdfBlob(buildPartnershipBlocks({ ...data, lang, branchLabel }), lang, branchLabel);
 }
 // Support plans of many children in one file; each child starts on a new page.
 export function generateAllPlansPdfBlob({ plans, lang, branchLabel, emptyText }) {
