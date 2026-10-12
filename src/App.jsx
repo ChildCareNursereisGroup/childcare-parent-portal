@@ -352,51 +352,69 @@ function Logo({ size = 64 }) {
 }
 function Landing({ onNew, onExisting, onBranchAdmin }) {
   const { lang, setLang, tr } = useLang();
+  const branchColors = ["bg-pink-50 text-pink-600 border-pink-100", "bg-sky-50 text-sky-600 border-sky-100", "bg-amber-50 text-amber-600 border-amber-100", "bg-emerald-50 text-emerald-600 border-emerald-100", "bg-violet-50 text-violet-600 border-violet-100"];
   return (
-    <div className="h-full overflow-y-auto bg-gradient-to-b from-sky-500 via-cyan-400 to-emerald-300 text-white relative">
-      <button onClick={() => setLang(lang === "ar" ? "en" : "ar")} className="absolute top-4 left-4 bg-white/20 rounded-full px-3 py-1.5 text-xs font-bold flex items-center gap-1 z-10">
-        <Globe className="w-3.5 h-3.5" /> {lang === "ar" ? "English" : "العربية"}
-      </button>
-
-      <div className="relative px-6 pt-10 pb-6 text-center overflow-hidden">
-        <span className="absolute w-4 h-4 rounded-full bg-white/25" style={{ top: 10, right: 30 }} />
-        <span className="absolute w-2.5 h-2.5 rounded-full bg-white/25" style={{ top: 40, right: 70 }} />
-        <span className="absolute text-white/40" style={{ top: 16, left: 40, fontSize: 18 }}>★</span>
-        <span className="absolute text-white/30" style={{ top: 60, left: 20, fontSize: 12 }}>★</span>
-
-        <div className="flex justify-center mb-3"><Logo /></div>
-        <h1 className="text-lg font-extrabold">{tr("مجموعة رعاية الطفل للحضانات", "Child Care Nurseries Group")}</h1>
-        <p className="text-sky-50 text-xs mt-1">{tr("بوابة أولياء الأمور", "Parent Portal")}</p>
+    <div className="h-full overflow-y-auto bg-white relative">
+      <div className="relative h-60 overflow-hidden">
+        <img src={imgUrl("dance.jpg")} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-sky-700/90 via-sky-600/45 to-sky-400/25" />
+        <button onClick={() => setLang(lang === "ar" ? "en" : "ar")} className="absolute top-4 left-4 bg-white/25 backdrop-blur rounded-full px-3 py-1.5 text-xs font-bold flex items-center gap-1 text-white z-10">
+          <Globe className="w-3.5 h-3.5" /> {lang === "ar" ? "English" : "العربية"}
+        </button>
+        <div className="absolute inset-x-0 bottom-9 text-center text-white px-6">
+          <div className="flex justify-center mb-2"><Logo size={56} /></div>
+          <h1 className="text-xl font-extrabold drop-shadow">{tr("مجموعة رعاية الطفل للحضانات", "Child Care Nurseries Group")}</h1>
+          <p className="text-sky-50 text-xs mt-0.5">{tr("بوابة أولياء الأمور", "Parent Portal")}</p>
+        </div>
       </div>
 
-      <div className="bg-white rounded-t-[2rem] px-5 pt-5 pb-6 text-slate-700 min-h-[420px]">
-        <p className="text-xs leading-relaxed text-center text-slate-500 mb-4">
-          {tr(
-            "تأسست مجموعة رعاية الطفل للحضانات عام 2014 لتقدّم بيئة تعليمية آمنة ومحبة لأطفالكم، معتمدة على منهج مونتيسوري ومتوافقة مع اشتراطات هيئة الشارقة للتعليم الخاص (سبيا).",
-            "Founded in 2014, Child Care Nurseries Group provides a safe, loving learning environment for your children, built on the Montessori approach and compliant with SPEA requirements."
-          )}
-        </p>
-
-        <p className="text-[11px] font-bold text-slate-400 text-center mb-2">{tr("فروعنا", "Our branches")}</p>
-        <div className="flex flex-wrap gap-1.5 justify-center mb-5">
-          {BRANCHES.map((b) => (
-            <span key={b.key} className="text-[10.5px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-bold">{tr(b.name.ar, b.name.en)}</span>
+      <div className="relative -mt-6 bg-white rounded-t-[2rem] px-5 pt-6 pb-8 text-slate-700">
+        <div className="flex gap-2 justify-center mb-4">
+          {[
+            { e: "🌱", ar: "منذ 2014", en: "Since 2014" },
+            { e: "🎨", ar: "منهج مونتيسوري", en: "Montessori" },
+            { e: "🏫", ar: "5 فروع", en: "5 branches" },
+          ].map((c) => (
+            <div key={c.ar} className="flex-1 bg-sky-50 border border-sky-100 rounded-2xl py-2 text-center">
+              <div className="text-lg leading-none">{c.e}</div>
+              <div className="text-[10.5px] font-extrabold text-sky-700 mt-1">{tr(c.ar, c.en)}</div>
+            </div>
           ))}
         </div>
 
-        <button onClick={onNew} className="w-full bg-sky-500 text-white font-bold py-3 rounded-xl text-sm mb-2.5 shadow-sm">
-          {tr("📝 تسجيل طفل جديد في الحضانة", "📝 Register a new child")}
+        <p className="text-xs leading-relaxed text-center text-slate-500 mb-4">
+          {tr(
+            "بيئة تعليمية آمنة ومحبة لأطفالكم، معتمدة على منهج مونتيسوري ومتوافقة مع اشتراطات هيئة الشارقة للتعليم الخاص (سبيا).",
+            "A safe, loving learning environment for your children, built on the Montessori approach and compliant with SPEA requirements."
+          )}
+        </p>
+
+        <div className="flex flex-wrap gap-1.5 justify-center mb-5">
+          {BRANCHES.map((b, i) => (
+            <span key={b.key} className={`text-[10.5px] px-3 py-1 rounded-full font-bold border ${branchColors[i % branchColors.length]}`}>{tr(b.name.ar, b.name.en)}</span>
+          ))}
+        </div>
+
+        <button onClick={onNew} className="w-full bg-gradient-to-l from-orange-500 to-amber-400 text-white font-extrabold py-3.5 rounded-2xl text-sm shadow-lg shadow-orange-200 mb-1">
+          {tr("📝 سجّلي طفلك الآن", "📝 Register your child")}
         </button>
-        <button onClick={onExisting} className="w-full bg-white border-2 border-sky-500 text-sky-600 font-bold py-3 rounded-xl text-sm">
+        <p className="text-[10.5px] text-slate-400 text-center mb-3">{tr("8 خطوات سهلة · حوالي 5 دقايق · من الموبايل", "8 easy steps · about 5 minutes · from your phone")}</p>
+        <button onClick={onExisting} className="w-full bg-white border-2 border-sky-400 text-sky-600 font-bold py-3 rounded-2xl text-sm">
           {tr("عندي حساب بالفعل — تسجيل الدخول", "I already have an account — Log in")}
         </button>
 
-        <p className="text-[10px] text-slate-400 text-center mt-4 leading-relaxed">
-          {tr("ⓘ لو دي أول مرة، اضغطي \"تسجيل طفل جديد\" ومحتاجيش حساب. بعد موافقة الإدارة، هيتبعتلك رابط دخول لمتابعة كل حاجة عن طفلك.", "ⓘ First time here? Tap \"Register a new child\" — no account needed. Once approved, you'll get a login link to follow everything about your child.")}
+        <p className="text-[10.5px] text-slate-400 text-center mt-4 leading-relaxed">
+          {tr("ⓘ لو دي أول مرة، اضغطي \"سجّلي طفلك\" ومحتاجيش حساب. بعد موافقة الإدارة هيتبعتلك رابط دخول لمتابعة كل حاجة عن طفلك.", "ⓘ First time? Tap \"Register your child\" — no account needed. After management approval you'll get a login link to follow everything about your child.")}
         </p>
-        <button onClick={onBranchAdmin} className="w-full text-center text-[10px] text-slate-300 font-bold mt-4">
-          {tr("دخول إدارة الفرع", "Branch admin login")}
-        </button>
+
+        <div className="mt-6 pt-5 border-t border-slate-100">
+          <p className="text-[11px] text-slate-400 text-center mb-2">{tr("للعاملين في الحضانة", "For nursery staff")}</p>
+          <button onClick={onBranchAdmin} className="w-full flex items-center justify-center gap-2 bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm shadow-md">
+            <Building2 className="w-4 h-4" /> {tr("دخول إدارة الفرع", "Branch admin login")}
+          </button>
+        </div>
+
+        <p className="text-[10px] text-slate-300 text-center mt-4" dir="ltr">childcareuae.com</p>
       </div>
     </div>
   );
