@@ -7,7 +7,8 @@ import {
   Building2, Music2
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
-import { BranchLogin, BranchAdminScreen, DOMAINS } from "./BranchAdmin";
+import { BranchLogin, BranchAdminScreen } from "./BranchAdmin";
+import { DOMAINS, LEVELS, AGE_BANDS, messageFor, skillById, domainAverage } from "./devBank";
 import { generateFormPdfBlob } from "./lib/pdfExport";
 import { TERMS, CONSENTS, TERMS_VERSION } from "./terms";
 
@@ -641,107 +642,10 @@ function ScheduleScreen({ showToast }) {
   );
 }
 
-// ---------------- Reports ----------------
+// ---------------- Reports (monthly development report) ----------------
 function ReportsScreen({ registrationId }) {
-  const { tr } = useLang();
-  const [view, setView] = useState("daily");
-  return (
-    <div className="h-full flex flex-col">
-      <div className="flex gap-2 justify-center pt-3 pb-1">
-        <button onClick={() => setView("daily")} className={`text-xs font-bold px-3 py-1.5 rounded-full ${view === "daily" ? "bg-slate-800 text-white" : "bg-white text-slate-400 border border-slate-200"}`}>{tr("يومي", "Daily")}</button>
-        <button onClick={() => setView("monthly")} className={`text-xs font-bold px-3 py-1.5 rounded-full ${view === "monthly" ? "bg-slate-800 text-white" : "bg-white text-slate-400 border border-slate-200"}`}>{tr("التقييم الشهري", "Monthly evaluation")}</button>
-      </div>
-      <div className="flex-1 overflow-hidden">
-        {view === "daily" ? <DailyReportsView registrationId={registrationId} /> : <MonthlyEvalView registrationId={registrationId} />}
-      </div>
-    </div>
-  );
-}
-
-function DailyReportsView({ registrationId }) {
-  const { tr } = useLang();
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [idx, setIdx] = useState(0);
-
-  useEffect(() => {
-    if (!registrationId) { setLoading(false); return; }
-    setLoading(true);
-    supabase
-      .from("daily_reports")
-      .select("*")
-      .eq("registration_id", registrationId)
-      .order("report_date", { ascending: false })
-      .limit(14)
-      .then(({ data }) => { setReports(data || []); setIdx(0); setLoading(false); });
-  }, [registrationId]);
-
-  if (loading) return <p className="text-xs text-slate-400 text-center pt-10">{tr("جارِ التحميل...", "Loading...")}</p>;
-
-  if (reports.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center px-8 text-center">
-        <p className="text-xs text-slate-400 leading-relaxed">{tr("لسه معملش تقرير يومي لطفلك. هيظهر هنا أول ما المربية تسجّل تقرير اليوم.", "No daily report yet. It'll show up here once the teacher logs today's report.")}</p>
-      </div>
-    );
-  }
-
-  const r = reports[idx];
-
-  return (
-    <div className="px-4 py-4 space-y-3 overflow-y-auto h-full pb-4">
-      <div className="flex gap-2 justify-center flex-wrap">
-        {reports.map((rep, i) => (
-          <button key={rep.id} onClick={() => setIdx(i)} className={`text-xs font-bold px-3 py-1.5 rounded-full ${i === idx ? "bg-slate-800 text-white" : "bg-white text-slate-400 border border-slate-200"}`}>
-            {rep.report_date}
-          </button>
-        ))}
-      </div>
-
-      {r.absent ? (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 text-center">
-          <p className="text-sm font-bold text-slate-600">{tr("طفلك كان غايب في اليوم ده", "Your child was absent this day")}</p>
-        </div>
-      ) : (
-        <>
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-2">
-              <UtensilsCrossed className="w-4 h-4 text-emerald-500" />
-              <p className="font-bold text-slate-800 text-sm">{tr("الأكل والشرب", "Food & drink")}</p>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">{r.meals || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-2">
-              <Moon className="w-4 h-4 text-indigo-500" />
-              <p className="font-bold text-slate-800 text-sm">{tr("النوم", "Sleep")}</p>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">{r.sleep || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-2">
-              <Smile className="w-4 h-4 text-amber-500" />
-              <p className="font-bold text-slate-800 text-sm">{tr("النشاط والمزاج", "Activity & mood")}</p>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">{r.activity || tr("مفيش تفاصيل مسجّلة", "No details recorded")}</p>
-          </div>
-        </>
-      )}
-
-      {r.notes && (
-        <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100 space-y-2">
-          <p className="text-xs font-bold text-sky-600">{tr("ملاحظة المربية", "Teacher's note")}</p>
-          <p className="text-xs text-slate-600 leading-relaxed bg-white rounded-lg p-2">{r.notes}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MonthlyEvalView({ registrationId }) {
-  const { tr } = useLang();
+  const { lang, tr } = useLang();
+  const [child, setChild] = useState(null);
   const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [idx, setIdx] = useState(0);
@@ -749,12 +653,15 @@ function MonthlyEvalView({ registrationId }) {
   useEffect(() => {
     if (!registrationId) { setLoading(false); return; }
     setLoading(true);
-    supabase
-      .from("monthly_evaluations")
-      .select("*")
-      .eq("registration_id", registrationId)
-      .order("month", { ascending: false })
-      .then(({ data }) => { setEvaluations(data || []); setIdx(0); setLoading(false); });
+    Promise.all([
+      supabase.from("portal_registrations").select("form_data").eq("id", registrationId).single(),
+      supabase.from("monthly_evaluations").select("*").eq("registration_id", registrationId).order("month", { ascending: false }),
+    ]).then(([reg, ev]) => {
+      setChild(reg.data?.form_data || {});
+      setEvaluations(ev.data || []);
+      setIdx(0);
+      setLoading(false);
+    });
   }, [registrationId]);
 
   if (loading) return <p className="text-xs text-slate-400 text-center pt-10">{tr("جارِ التحميل...", "Loading...")}</p>;
@@ -762,15 +669,16 @@ function MonthlyEvalView({ registrationId }) {
   if (evaluations.length === 0) {
     return (
       <div className="h-full flex items-center justify-center px-8 text-center">
-        <p className="text-xs text-slate-400 leading-relaxed">{tr("لسه معملش تقييم شهري لطفلك. هيظهر هنا أول ما المربية تسجّله.", "No monthly evaluation yet. It'll show up here once the teacher logs it.")}</p>
+        <p className="text-xs text-slate-400 leading-relaxed">{tr("تقرير نمو طفلك الشهري هيظهر هنا في آخر كل شهر 🌱", "Your child's monthly development report will appear here at the end of each month 🌱")}</p>
       </div>
     );
   }
 
   const e = evaluations[idx];
   const ratings = e.ratings || {};
-  const observations = e.observations || {};
-  const nextSteps = e.next_steps || {};
+  const band = AGE_BANDS.find((b) => b.id === e.age_band);
+  const firstName = (child?.name || "").trim().split(" ")[0];
+  const colorOf = (v) => LEVELS.find((L) => L.v === v)?.color || "#94a3b8";
 
   return (
     <div className="px-4 py-4 space-y-3 overflow-y-auto h-full pb-4">
@@ -782,29 +690,41 @@ function MonthlyEvalView({ registrationId }) {
         ))}
       </div>
 
-      {e.teacher_name && <p className="text-xs text-slate-400 text-center">{tr("بواسطة", "By")} {e.teacher_name}</p>}
+      <div className="bg-gradient-to-br from-sky-500 to-cyan-400 rounded-2xl p-4 text-white text-center">
+        <p className="text-sm font-extrabold">{tr(`تقرير نمو ${firstName || "طفلك"} — ${e.month}`, `${firstName || "Your child"}'s development report — ${e.month}`)}</p>
+        {band && <p className="text-[11px] text-sky-50 mt-1">{tr(`المرحلة: ${band.ar}`, `Stage: ${band.en}`)}</p>}
+        {e.teacher_name && <p className="text-[11px] text-sky-50">{tr("المعلمة:", "Teacher:")} {e.teacher_name}</p>}
+      </div>
 
       {DOMAINS.map((d) => {
-        const rating = ratings[d.id] || 0;
-        if (!rating && !observations[d.id] && !nextSteps[d.id]) return null;
+        const ids = Object.keys(ratings).filter((id) => ratings[id] && skillById(id)?.domain === d.id);
+        if (ids.length === 0) return null;
+        const avg = Math.round(domainAverage(ratings, d.id));
         return (
           <div key={d.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-2">
-              <div dir="ltr">{"★".repeat(rating)}{"☆".repeat(5 - rating)}</div>
-              <div className="flex items-center gap-2">
-                <p className="font-bold text-slate-800 text-sm">{tr(d.ar, d.en)}</p>
-                <span>{d.icon}</span>
-              </div>
+              <div dir="ltr" className="text-sm" style={{ color: "#EF9F27" }}>{"★".repeat(avg)}<span className="text-slate-200">{"★".repeat(5 - avg)}</span></div>
+              <p className="font-bold text-slate-800 text-sm flex items-center gap-2">{tr(d.ar, d.en)} <span>{d.icon}</span></p>
             </div>
-            {observations[d.id] && <p className="text-xs text-slate-600 leading-relaxed mb-1">{observations[d.id]}</p>}
-            {nextSteps[d.id] && <p className="text-[11px] text-sky-600 leading-relaxed">{tr("الخطوة القادمة: ", "Next step: ")}{nextSteps[d.id]}</p>}
+            <div className="space-y-2">
+              {ids.map((id) => {
+                const sk = skillById(id);
+                const lv = ratings[id];
+                return (
+                  <div key={id} className="rounded-xl p-2.5" style={{ background: `${colorOf(lv)}14`, borderRight: `3px solid ${colorOf(lv)}` }}>
+                    <p className="text-[11px] font-bold mb-0.5" style={{ color: colorOf(lv) }}>{tr(sk.ar, sk.en)}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed">{messageFor({ skillId: id, level: lv, name: child?.name, gender: child?.gender, lang })}</p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
       })}
 
       {e.general_note && (
         <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100 space-y-2">
-          <p className="text-xs font-bold text-sky-600">{tr("ملاحظة عامة", "General note")}</p>
+          <p className="text-xs font-bold text-sky-600">{tr("ملاحظة من المعلمة", "Note from the teacher")}</p>
           <p className="text-xs text-slate-600 leading-relaxed bg-white rounded-lg p-2">{e.general_note}</p>
         </div>
       )}
@@ -1925,3 +1845,4 @@ export default function ParentPortalPrototype() {
     </LangCtx.Provider>
   );
 }
+

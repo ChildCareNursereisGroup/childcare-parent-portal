@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import {
-  ChevronLeft, LogOut, Search, CheckCircle2, X, UtensilsCrossed, Moon,
+  ChevronLeft, LogOut, Search, CheckCircle2, X,
   Smile, FileText, Users,
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
+import { DOMAINS, AGE_BANDS, LEVELS, skillsFor, messageFor, bandForMonths, ageInMonths } from "./devBank";
+
+export { DOMAINS };
 
 const BRANCH_LABELS = {
   farha: { ar: "الفرحة – القاسمية", en: "Al Farha" },
@@ -52,19 +55,6 @@ const KEY_LABELS = {
 };
 
 const SKIP_KEYS = new Set(["signatureDataUrl", "branch"]);
-
-const MEAL_OPTIONS = { ar: ["أكل الكل", "أكل جزء", "رفض الأكل", "شرب مية كويس", "شرب مية قليل"], en: ["Ate all", "Ate some", "Refused food", "Drank water well", "Drank little water"] };
-const SLEEP_OPTIONS = { ar: ["نام كويس", "نام شوية", "مانامش خالص"], en: ["Slept well", "Slept a little", "Didn't sleep at all"] };
-const ACTIVITY_OPTIONS = { ar: ["مبسوط", "هادي", "متضايق", "نشيط", "لعب مع الأصدقاء", "رسم", "أنشطة حركية", "موسيقى"], en: ["Happy", "Calm", "Upset", "Energetic", "Played with friends", "Drawing", "Physical activity", "Music"] };
-
-export const DOMAINS = [
-  { id: "lang", ar: "اللغة والتواصل", en: "Language & Communication", sub: { ar: "نطق • مفردات • قصص", en: "Speech • vocabulary • stories" }, icon: "🗣️", placeholder: { ar: "ذكر 5 كلمات جديدة، يجيب بجمل قصيرة...", en: "Said 5 new words, answers in short sentences..." } },
-  { id: "motor_g", ar: "المهارات الحركية الكبيرة", en: "Gross Motor Skills", sub: { ar: "توازن • مشي • قفز", en: "Balance • walking • jumping" }, icon: "🏃", placeholder: { ar: "يركض بدون سقوط، يصعد الدرج بثقة...", en: "Runs without falling, climbs stairs confidently..." } },
-  { id: "motor_f", ar: "المهارات الحركية الدقيقة", en: "Fine Motor Skills", sub: { ar: "إمساك • رسم • قص", en: "Grip • drawing • cutting" }, icon: "✋", placeholder: { ar: "يمسك القلم صح، يقص بالمقص بإرشاد...", en: "Holds pencil correctly, cuts with guidance..." } },
-  { id: "social", ar: "التطور الاجتماعي والعاطفي", en: "Social & Emotional", sub: { ar: "مشاركة • تعاون • مشاعر", en: "Sharing • cooperation • emotions" }, icon: "❤️", placeholder: { ar: "شارك الألعاب، عبّر عن مشاعره بكلمات...", en: "Shared toys, expressed feelings in words..." } },
-  { id: "cognitive", ar: "التطور المعرفي", en: "Cognitive Development", sub: { ar: "تفكير • حل مشكلات • تصنيف", en: "Thinking • problem-solving • sorting" }, icon: "🧠", placeholder: { ar: "رتّب الأشكال حسب اللون، حل لغز بسيط...", en: "Sorted shapes by color, solved a simple puzzle..." } },
-  { id: "selfcare", ar: "الاستقلالية والعناية الذاتية", en: "Independence & Self-care", sub: { ar: "نظافة • ترتيب • تناول طعام", en: "Hygiene • tidiness • eating" }, icon: "⭐", placeholder: { ar: "يغسل يديه وحده، يرتب أغراضه...", en: "Washes hands alone, tidies belongings..." } },
-];
 
 export const EVAL_FLAGS = {
   ar: [
@@ -167,124 +157,170 @@ function StatusChip({ status, tr }) {
   );
 }
 
-function StarRating({ value, onChange }) {
-  return (
-    <div className="flex gap-1" dir="ltr">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button key={n} type="button" onClick={() => onChange(n)} className="text-lg leading-none" style={{ color: n <= (value || 0) ? "#EF9F27" : "#e2e8f0" }}>
-          ★
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function currentMonthKey() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function MonthlyEvalSection({ tr, lang, reg, token, showToast }) {
+function endOfMonth(monthKey) {
+  const [y, m] = monthKey.split("-").map(Number);
+  return new Date(y, m, 0);
+}
+
+function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
+  const f = reg.form_data || {};
   const [month, setMonth] = useState(currentMonthKey());
+  const [band, setBand] = useState("C");
   const [teacherName, setTeacherName] = useState("");
   const [ratings, setRatings] = useState({});
-  const [observations, setObservations] = useState({});
-  const [nextSteps, setNextSteps] = useState({});
   const [flags, setFlags] = useState([]);
   const [generalNote, setGeneralNote] = useState("");
   const [evaluations, setEvaluations] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState({ lang: true });
+  const [showAllMsgs, setShowAllMsgs] = useState({});
+
+  const months = ageInMonths(f.dob, endOfMonth(month));
+  const autoBand = months === null ? "C" : bandForMonths(months);
+  const ageText = months === null ? "—" : months < 24 ? tr(`${months} شهر`, `${months} months`) : tr(`${Math.floor(months / 12)} سنة و${months % 12} شهر`, `${Math.floor(months / 12)}y ${months % 12}m`);
 
   const load = () => {
     supabase.functions.invoke("branch-admin", { body: { action: "list_evaluations", token, registration_id: reg.id } })
       .then(({ data }) => setEvaluations(data?.evaluations || []));
   };
-
   useEffect(() => { load(); }, [reg.id]);
 
   useEffect(() => {
     const existing = evaluations.find((e) => e.month === month);
     if (existing) {
+      setBand(existing.age_band || autoBand);
       setTeacherName(existing.teacher_name || "");
       setRatings(existing.ratings || {});
-      setObservations(existing.observations || {});
-      setNextSteps(existing.next_steps || {});
       setFlags(existing.flags || []);
       setGeneralNote(existing.general_note || "");
     } else {
+      setBand(autoBand);
       setTeacherName("");
       setRatings({});
-      setObservations({});
-      setNextSteps({});
       setFlags([]);
       setGeneralNote("");
     }
-  }, [month, evaluations]);
+  }, [month, evaluations, autoBand]);
 
-  const toggleFlag = (id) => {
-    setFlags((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
-  };
-
-  const activeFlagAlerts = EVAL_FLAGS[lang].filter((f) => flags.includes(f.id));
+  const skills = skillsFor(band);
+  const total = DOMAINS.reduce((n, d) => n + skills[d.id].length, 0);
+  const done = DOMAINS.reduce((n, d) => n + skills[d.id].filter((s) => ratings[s.id]).length, 0);
+  const alreadyDone = evaluations.some((e) => e.month === month);
+  const msg = (skillId, level) => messageFor({ skillId, level, name: f.name, gender: f.gender, lang });
+  const activeFlagAlerts = EVAL_FLAGS[lang].filter((x) => flags.includes(x.id));
 
   const save = async () => {
+    if (done === 0) { showToast(tr("اختاري مستوى مهارة واحدة على الأقل", "Pick a level for at least one skill")); return; }
     setSaving(true);
     const { data, error } = await supabase.functions.invoke("branch-admin", {
-      body: { action: "save_evaluation", token, registration_id: reg.id, month, teacher_name: teacherName, ratings, observations, next_steps: nextSteps, flags, general_note: generalNote },
+      body: { action: "save_evaluation", token, registration_id: reg.id, month, age_band: band, teacher_name: teacherName, ratings, observations: {}, next_steps: {}, flags, general_note: generalNote },
     });
     setSaving(false);
     if (error || data?.error) { showToast(tr("حصل خطأ في حفظ التقييم", "Failed to save evaluation")); return; }
-    showToast(tr("تم حفظ التقييم الشهري", "Monthly evaluation saved"));
+    showToast(tr("تم حفظ التقييم الشهري ✓", "Monthly evaluation saved ✓"));
     load();
+    onChanged();
   };
 
   return (
     <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-bold text-slate-500">{tr("التقييم الشهري", "Monthly evaluation")}</p>
-        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1" />
+      <div className="flex items-center justify-between mb-1">
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-800" />
+        <p className="text-xs font-bold text-slate-600">{tr("📈 التقييم الشهري للنمو", "📈 Monthly development report")}</p>
+      </div>
+      <p className="text-[11px] text-slate-400 mb-2 text-right">{tr("يُسجَّل مرة واحدة كل شهر، في آخر الشهر.", "Recorded once a month, at the end of the month.")}</p>
+      <div className={`text-[11px] font-bold rounded-xl px-2.5 py-1.5 mb-3 text-right ${alreadyDone ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-700"}`}>
+        {alreadyDone ? tr(`✓ تقييم ${month} محفوظ (تقدري تعدّليه)`, `✓ ${month} evaluation saved (you can edit it)`) : tr(`⏳ تقييم ${month} لسه ما اتسجلش`, `⏳ ${month} evaluation not recorded yet`)}
       </div>
 
-      <input value={teacherName} onChange={(e) => setTeacherName(e.target.value)} placeholder={tr("اسم المعلمة", "Teacher's name")}
-        className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mb-3" />
-
-      <div className="space-y-3">
-        {DOMAINS.map((d) => (
-          <div key={d.id} className="bg-white rounded-xl p-2.5 border border-slate-100">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span>{d.icon}</span>
-              <div>
-                <div className="text-xs font-bold text-slate-700">{tr(d.ar, d.en)}</div>
-                <div className="text-[10px] text-slate-400">{tr(d.sub.ar, d.sub.en)}</div>
-              </div>
-            </div>
-            <StarRating value={ratings[d.id]} onChange={(v) => setRatings((r) => ({ ...r, [d.id]: v }))} />
-            <textarea value={observations[d.id] || ""} onChange={(e) => setObservations((o) => ({ ...o, [d.id]: e.target.value }))}
-              placeholder={tr(d.placeholder.ar, d.placeholder.en)} rows={2}
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] mt-1.5" />
-            <input value={nextSteps[d.id] || ""} onChange={(e) => setNextSteps((n) => ({ ...n, [d.id]: e.target.value }))}
-              placeholder={tr("الخطوة التالية...", "Next step...")}
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] mt-1.5" />
-          </div>
+      <p className="text-[11px] text-slate-500 mb-1 text-right">{tr(`عمر الطفل في الشهر ده: ${ageText}`, `Child's age this month: ${ageText}`)}</p>
+      <p className="text-[11px] font-bold text-slate-500 mb-1 text-right">{tr("مرحلة المهارات المراد تقييمها:", "Skills stage to assess:")}</p>
+      <div className="flex flex-wrap gap-1.5 justify-end mb-1">
+        {AGE_BANDS.map((b) => (
+          <Chip key={b.id} label={`${tr(b.ar, b.en)}${b.id === autoBand ? " ★" : ""}`} active={band === b.id} onClick={() => setBand(b.id)} />
         ))}
       </div>
+      <p className="text-[10px] text-slate-400 mb-3 text-right">{tr("★ = المرحلة المناسبة لعمره. تقدري تختاري مرحلة تانية لو الطفل أبطأ أو أسرع.", "★ = stage matching the child's age. Pick another stage if the child is ahead or behind.")}</p>
 
-      <p className="text-[11px] font-bold text-slate-500 mt-3 mb-1.5">{tr("علامات تستدعي انتباهاً خاصاً", "Flags needing special attention")}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {EVAL_FLAGS[lang].map((f) => (
-          <Chip key={f.id} label={f.label} active={flags.includes(f.id)} onClick={() => toggleFlag(f.id)} />
+      <p className="text-[11px] font-bold text-slate-500 mb-2 text-right">{tr(`تم تقييم ${done} من ${total} مهارة`, `${done} of ${total} skills rated`)}</p>
+
+      <div className="space-y-2">
+        {DOMAINS.map((d) => {
+          const isOpen = !!open[d.id];
+          const n = skills[d.id].filter((s) => ratings[s.id]).length;
+          return (
+            <div key={d.id} className="bg-white rounded-xl border border-slate-100">
+              <button type="button" onClick={() => setOpen((o) => ({ ...o, [d.id]: !o[d.id] }))} className="w-full flex items-center justify-between px-3 py-2.5">
+                <span className="text-[11px] text-slate-400">{n}/{skills[d.id].length}</span>
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">{d.icon} {tr(d.ar, d.en)}</span>
+              </button>
+              {isOpen && (
+                <div className="px-3 pb-3 space-y-3">
+                  {skills[d.id].map((s) => {
+                    const lv = ratings[s.id];
+                    return (
+                      <div key={s.id} className="border-t border-slate-100 pt-2">
+                        <p className="text-xs font-bold text-slate-700 text-right mb-1.5">{tr(s.ar, s.en)}</p>
+                        <div className="flex flex-wrap gap-1 justify-end">
+                          {LEVELS.map((L) => {
+                            const active = lv === L.v;
+                            return (
+                              <button key={L.v} type="button" onClick={() => setRatings((r) => ({ ...r, [s.id]: active ? undefined : L.v }))}
+                                className="text-[10.5px] font-bold px-2 py-1 rounded-full border"
+                                style={{ borderColor: L.color, background: active ? L.color : "#fff", color: active ? "#fff" : L.color }}>
+                                {L.v} · {tr(L.ar, L.en)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {lv && <p className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 rounded-lg p-2 mt-1.5 text-right">{msg(s.id, lv)}</p>}
+                        <button type="button" onClick={() => setShowAllMsgs((m) => ({ ...m, [s.id]: !m[s.id] }))} className="text-[10.5px] text-sky-500 font-bold mt-1">
+                          {showAllMsgs[s.id] ? tr("إخفاء الصيغ الجاهزة", "Hide ready messages") : tr("عرض الصيغ الخمس الجاهزة", "Show the 5 ready messages")}
+                        </button>
+                        {showAllMsgs[s.id] && (
+                          <div className="space-y-1 mt-1">
+                            {LEVELS.map((L) => (
+                              <button key={L.v} type="button" onClick={() => setRatings((r) => ({ ...r, [s.id]: L.v }))}
+                                className="w-full text-right text-[10.5px] leading-relaxed rounded-lg border p-2"
+                                style={{ borderColor: L.color, background: lv === L.v ? `${L.color}22` : "#fff" }}>
+                                <b style={{ color: L.color }}>{L.v} · {tr(L.ar, L.en)}</b><br />{msg(s.id, L.v)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-[11px] font-bold text-slate-500 mt-3 mb-1.5 text-right">{tr("علامات متابعة (للفريق فقط — مش بتظهر للأهل)", "Follow-up flags (staff only — not shown to parents)")}</p>
+      <div className="flex flex-wrap gap-1.5 justify-end">
+        {EVAL_FLAGS[lang].map((x) => (
+          <Chip key={x.id} label={x.label} active={flags.includes(x.id)} onClick={() => setFlags((fl) => (fl.includes(x.id) ? fl.filter((y) => y !== x.id) : [...fl, x.id]))} />
         ))}
       </div>
       {activeFlagAlerts.length > 0 && (
-        <div className="bg-rose-50 border border-rose-200 rounded-xl p-2.5 mt-2 text-[11px] text-rose-600 leading-relaxed">
-          {activeFlagAlerts.map((f) => (<p key={f.id}>{f.alert}</p>))}
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-2.5 mt-2 text-[11px] text-rose-600 leading-relaxed text-right">
+          {activeFlagAlerts.map((x) => (<p key={x.id}>{x.alert}</p>))}
         </div>
       )}
 
-      <textarea value={generalNote} onChange={(e) => setGeneralNote(e.target.value)} placeholder={tr("ملاحظة عامة (اختياري)", "General note (optional)")} rows={2}
-        className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mt-3" />
+      <input value={teacherName} onChange={(e) => setTeacherName(e.target.value)} placeholder={tr("اسم المعلمة", "Teacher's name")}
+        className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mt-3 bg-white text-slate-800" />
+      <textarea value={generalNote} onChange={(e) => setGeneralNote(e.target.value)} placeholder={tr("ملاحظة عامة للأهل (اختياري)", "General note to parents (optional)")} rows={2}
+        className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs mt-2 bg-white text-slate-800" />
 
-      <button onClick={save} disabled={saving} className="w-full bg-sky-500 text-white font-bold py-2 rounded-xl text-xs mt-3 disabled:opacity-60">
+      <button onClick={save} disabled={saving} className="w-full bg-sky-500 text-white font-bold py-2.5 rounded-xl text-xs mt-3 disabled:opacity-60">
         {saving ? tr("جارِ الحفظ...", "Saving...") : tr("حفظ التقييم الشهري", "Save monthly evaluation")}
       </button>
 
@@ -292,9 +328,9 @@ function MonthlyEvalSection({ tr, lang, reg, token, showToast }) {
         <div className="mt-3 pt-2 border-t border-slate-200 space-y-1">
           <p className="text-[11px] font-bold text-slate-400">{tr("تقييمات سابقة", "Past evaluations")}</p>
           {evaluations.map((e) => (
-            <div key={e.id} className="text-[11px] text-slate-500 flex items-center gap-2">
-              <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {e.month}{e.flags?.length ? ` — ⚑ ${e.flags.length}` : ""}
-            </div>
+            <button key={e.id} type="button" onClick={() => setMonth(e.month)} className="text-[11px] text-slate-500 flex items-center gap-2">
+              <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {e.month}
+            </button>
           ))}
         </div>
       )}
@@ -383,41 +419,7 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
   const [classSel, setClassSel] = useState(reg.class_id || "");
   const [newClassName, setNewClassName] = useState("");
   const [savingClass, setSavingClass] = useState(false);
-  const [reportDate, setReportDate] = useState(new Date().toISOString().slice(0, 10));
-  const [absent, setAbsent] = useState(false);
-  const [mealsSel, setMealsSel] = useState([]);
-  const [sleepSel, setSleepSel] = useState("");
-  const [activitySel, setActivitySel] = useState([]);
-  const [notes, setNotes] = useState("");
-  const [savingReport, setSavingReport] = useState(false);
-  const [reports, setReports] = useState([]);
   const [showAll, setShowAll] = useState(false);
-
-  useEffect(() => {
-    supabase.functions.invoke("branch-admin", { body: { action: "list_reports", token, registration_id: reg.id } })
-      .then(({ data }) => setReports(data?.reports || []));
-  }, [reg.id]);
-
-  useEffect(() => {
-    const existing = reports.find((r) => r.report_date === reportDate);
-    if (existing) {
-      setAbsent(!!existing.absent);
-      setMealsSel(existing.meals ? existing.meals.split("، ").filter((x) => MEAL_OPTIONS.ar.includes(x) || MEAL_OPTIONS.en.includes(x)) : []);
-      setSleepSel(existing.sleep || "");
-      setActivitySel(existing.activity ? existing.activity.split("، ").filter((x) => ACTIVITY_OPTIONS.ar.includes(x) || ACTIVITY_OPTIONS.en.includes(x)) : []);
-      setNotes(existing.notes || "");
-    } else {
-      setAbsent(false);
-      setMealsSel([]);
-      setSleepSel("");
-      setActivitySel([]);
-      setNotes("");
-    }
-  }, [reportDate, reports]);
-
-  const toggleFrom = (arr, setArr, value) => {
-    setArr(arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value]);
-  };
 
   const approve = async () => {
     setApproving(true);
@@ -461,28 +463,6 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
     setNewClassName("");
     showToast(tr("تم تحديث الفصل", "Class updated"));
     onChanged();
-  };
-
-  const saveReport = async () => {
-    setSavingReport(true);
-    const { data, error } = await supabase.functions.invoke("branch-admin", {
-      body: {
-        action: "save_report",
-        token,
-        registration_id: reg.id,
-        report_date: reportDate,
-        absent,
-        meals: mealsSel.join("، "),
-        sleep: sleepSel,
-        activity: activitySel.join("، "),
-        notes,
-      },
-    });
-    setSavingReport(false);
-    if (error || data?.error) { showToast(tr("حصل خطأ في حفظ التقرير", "Failed to save report")); return; }
-    showToast(tr("تم حفظ التقرير", "Report saved"));
-    supabase.functions.invoke("branch-admin", { body: { action: "list_reports", token, registration_id: reg.id } })
-      .then(({ data }) => setReports(data?.reports || []));
   };
 
   const knownEntries = Object.keys(KEY_LABELS).filter((k) => f[k] !== undefined && f[k] !== null && f[k] !== "");
@@ -586,67 +566,7 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
           </button>
         </div>
 
-        <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-slate-500">{tr("تقرير اليوم", "Daily report")}</p>
-            <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1" />
-          </div>
-
-          <button onClick={() => setAbsent((v) => !v)}
-            className={`w-full text-xs font-bold py-2 rounded-xl border mb-3 ${absent ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-500 border-slate-200"}`}>
-            {absent ? tr("☑ غايب النهاردة — مفيش تقرير", "☑ Absent today — no report") : tr("☐ غايب النهاردة؟", "☐ Absent today?")}
-          </button>
-
-          {!absent && (
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1.5"><UtensilsCrossed className="w-3 h-3" /> {tr("الأكل والشرب", "Food & drink")}</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {MEAL_OPTIONS[lang].map((opt) => (
-                    <Chip key={opt} label={opt} active={mealsSel.includes(opt)} onClick={() => toggleFrom(mealsSel, setMealsSel, opt)} />
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1.5"><Moon className="w-3 h-3" /> {tr("النوم", "Sleep")}</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {SLEEP_OPTIONS[lang].map((opt) => (
-                    <Chip key={opt} label={opt} active={sleepSel === opt} onClick={() => setSleepSel(sleepSel === opt ? "" : opt)} />
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="text-[11px] text-slate-400 flex items-center gap-1 mb-1.5"><Smile className="w-3 h-3" /> {tr("النشاط والمزاج", "Activity & mood")}</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {ACTIVITY_OPTIONS[lang].map((opt) => (
-                    <Chip key={opt} label={opt} active={activitySel.includes(opt)} onClick={() => toggleFrom(activitySel, setActivitySel, opt)} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-3">
-            <label className="text-[11px] text-slate-400 mb-1 block">{tr("ملاحظة إضافية (اختياري)", "Extra note (optional)")}</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={1} className="w-full border border-slate-200 rounded-xl px-2.5 py-2 text-xs" />
-          </div>
-
-          <button onClick={saveReport} disabled={savingReport} className="w-full bg-sky-500 text-white font-bold py-2 rounded-xl text-xs mt-3 disabled:opacity-60">
-            {savingReport ? tr("جارِ الحفظ...", "Saving...") : tr("حفظ التقرير", "Save report")}
-          </button>
-          {reports.length > 0 && (
-            <div className="mt-3 pt-2 border-t border-slate-200 space-y-1">
-              <p className="text-[11px] font-bold text-slate-400">{tr("آخر التقارير", "Recent reports")}</p>
-              {reports.slice(0, 5).map((r) => (
-                <div key={r.id} className="text-[11px] text-slate-500 flex items-center gap-2">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {r.report_date}{r.absent ? ` — ${tr("غياب", "Absent")}` : ""}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <MonthlyEvalSection tr={tr} lang={lang} reg={reg} token={token} showToast={showToast} />
+        <SkillEvalSection tr={tr} lang={lang} reg={reg} token={token} showToast={showToast} onChanged={onChanged} />
 
         <button onClick={deleteRegistration} disabled={deleting} className="w-full bg-white text-rose-500 border border-rose-200 font-bold py-2.5 rounded-xl text-xs disabled:opacity-60">
           {deleting ? tr("جارِ المسح...", "Deleting...") : tr("🗑 مسح ملف الطفل نهائيًا", "🗑 Permanently delete this child's file")}
@@ -662,6 +582,7 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
+  const [onlyPending, setOnlyPending] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -689,6 +610,12 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
     })
     .sort((a, b) => (a.form_data?.name || "").localeCompare(b.form_data?.name || "", "ar"));
 
+  const nowMonth = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
+  const lateInMonth = new Date().getDate() >= 20;
+  const needsEval = (r) => r.status === "approved" && !(r.eval_months || []).includes(nowMonth);
+  const shown = onlyPending ? filtered.filter(needsEval) : filtered;
+  const pendingCount = regs.filter(needsEval).length;
+
   const selectedReg = selected ? regs.find((r) => r.id === selected) : null;
 
   return (
@@ -715,13 +642,20 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
         {loading && <p className="text-xs text-slate-400 text-center">{tr("جارِ التحميل...", "Loading...")}</p>}
+        {pendingCount > 0 && (
+          <button type="button" onClick={() => setOnlyPending((v) => !v)}
+            className={`w-full text-[11px] font-bold rounded-xl px-3 py-2 text-right ${onlyPending ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
+            {onlyPending ? tr("عرض كل الأطفال", "Show all children") : tr(`⏳ ${pendingCount} طفل لسه ما اتعملش تقييمهم الشهري لشهر ${nowMonth}`, `⏳ ${pendingCount} children still need their ${nowMonth} monthly evaluation`)}
+          </button>
+        )}
         {!loading && filtered.length === 0 && <p className="text-xs text-slate-400 text-center">{tr("لا يوجد أطفال مطابقين", "No matching children")}</p>}
-        {filtered.map((r) => (
+        {shown.map((r) => (
           <button key={r.id} onClick={() => setSelected(r.id)} className="w-full bg-white rounded-2xl p-3 shadow-sm border border-slate-100 text-right flex items-center justify-between">
             <ChevronLeft className="w-4 h-4 text-slate-300" />
             <div className="flex-1 text-right">
               <div className="flex items-center gap-2 justify-end mb-1">
                 <StatusChip status={r.status} tr={tr} />
+                {needsEval(r) && lateInMonth && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">{tr("⏳ التقييم الشهري", "⏳ Monthly eval")}</span>}
                 {r.class_id && <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">{classNameById[r.class_id]}</span>}
               </div>
               <p className="text-sm font-bold text-slate-800">{r.form_data?.name || tr("بدون اسم", "No name")}</p>

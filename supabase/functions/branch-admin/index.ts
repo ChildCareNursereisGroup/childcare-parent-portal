@@ -109,7 +109,12 @@ Deno.serve(async (req) => {
         .eq("branch", branch)
         .order("name", { ascending: true });
 
-      return json({ branch, registrations: withUrls, classes: classes || [] });
+      const { data: evalRows } = await admin.from("monthly_evaluations").select("registration_id, month").eq("branch", branch);
+      const evalMap: Record<string, string[]> = {};
+      for (const e of evalRows || []) (evalMap[e.registration_id] ||= []).push(e.month);
+      const withEvals = withUrls.map((r) => ({ ...r, eval_months: evalMap[r.id] || [] }));
+
+      return json({ branch, registrations: withEvals, classes: classes || [] });
     }
 
     if (action === "approve") {
@@ -319,7 +324,7 @@ Deno.serve(async (req) => {
     if (action === "save_evaluation") {
       const branch = await requireBranchSession(body.token);
       if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
-      const { registration_id, month, teacher_name, ratings, observations, next_steps, flags, general_note } = body;
+      const { registration_id, month, teacher_name, ratings, observations, next_steps, flags, general_note, age_band } = body;
       if (!month) return json({ error: "الشهر مطلوب" }, 400);
       const { data: reg, error: regErr } = await admin
         .from("portal_registrations")
@@ -336,6 +341,7 @@ Deno.serve(async (req) => {
           branch,
           month,
           teacher_name: teacher_name || null,
+          age_band: age_band || null,
           ratings: ratings || {},
           observations: observations || {},
           next_steps: next_steps || {},
