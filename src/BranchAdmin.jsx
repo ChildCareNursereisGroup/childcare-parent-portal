@@ -416,6 +416,7 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
   const [approving, setApproving] = useState(false);
   const [settingStatus, setSettingStatus] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirming, setConfirming] = useState(null);
   const [classSel, setClassSel] = useState(reg.class_id || "");
   const [newClassName, setNewClassName] = useState("");
   const [savingClass, setSavingClass] = useState(false);
@@ -431,7 +432,6 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
   };
 
   const setStatus = async (status) => {
-    if (status === "stopped" && !window.confirm(tr("متأكدة إنك عايزة توقفي تسجيل الطفل ده؟ الأهل مش هيقدروا يشوفوا بياناته بعد كده.", "Are you sure you want to withdraw this child? Parents will lose access to their data."))) return;
     setSettingStatus(true);
     const { data, error } = await supabase.functions.invoke("branch-admin", { body: { action: "set_status", token, registration_id: reg.id, status } });
     setSettingStatus(false);
@@ -441,9 +441,6 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
   };
 
   const deleteRegistration = async () => {
-    const name = f.name || tr("الطفل ده", "this child");
-    if (!window.confirm(tr(`متأكدة إنك عايزة تمسحي ملف ${name} نهائيًا؟ هيتمسح كل بياناته ومستنداته وتقاريره ومفيش رجعة في القرار ده.`, `Are you sure you want to permanently delete ${name}'s file? All their data, documents, and reports will be deleted — this cannot be undone.`))) return;
-    if (!window.confirm(tr("تأكيد أخير: هل إنتِ متأكدة 100%؟", "Final check: are you 100% sure?"))) return;
     setDeleting(true);
     const { data, error } = await supabase.functions.invoke("branch-admin", { body: { action: "delete_registration", token, registration_id: reg.id } });
     setDeleting(false);
@@ -491,7 +488,7 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
         )}
 
         {reg.status === "approved" && (
-          <button onClick={() => setStatus("stopped")} disabled={settingStatus} className="w-full bg-rose-50 text-rose-600 border border-rose-200 font-bold py-2.5 rounded-xl text-sm disabled:opacity-60">
+          <button onClick={() => setConfirming("stop")} disabled={settingStatus} className="w-full bg-rose-50 text-rose-600 border border-rose-200 font-bold py-2.5 rounded-xl text-sm disabled:opacity-60">
             {settingStatus ? tr("جارِ الحفظ...", "Saving...") : tr("⛔ إيقاف تسجيل الطفل (توقف عن الحضانة)", "⛔ Withdraw child from nursery")}
           </button>
         )}
@@ -568,10 +565,32 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
 
         <SkillEvalSection tr={tr} lang={lang} reg={reg} token={token} showToast={showToast} onChanged={onChanged} />
 
-        <button onClick={deleteRegistration} disabled={deleting} className="w-full bg-white text-rose-500 border border-rose-200 font-bold py-2.5 rounded-xl text-xs disabled:opacity-60">
+        <button onClick={() => setConfirming("delete")} disabled={deleting} className="w-full bg-white text-rose-500 border border-rose-200 font-bold py-2.5 rounded-xl text-xs disabled:opacity-60">
           {deleting ? tr("جارِ المسح...", "Deleting...") : tr("🗑 مسح ملف الطفل نهائيًا", "🗑 Permanently delete this child's file")}
         </button>
       </div>
+
+      {confirming && (
+        <div className="absolute inset-0 z-30 bg-slate-900/60 flex items-center justify-center p-6">
+          <div className="bg-white rounded-2xl p-5 w-full text-center space-y-3">
+            <p className="text-sm font-extrabold text-slate-800">
+              {confirming === "delete" ? tr("مسح ملف الطفل نهائياً؟", "Permanently delete this child's file?") : tr("إيقاف تسجيل الطفل؟", "Withdraw this child?")}
+            </p>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              {confirming === "delete"
+                ? tr("هيتمسح كل بياناته ومستنداته وتقييماته ومفيش رجعة في القرار ده.", "All data, documents and evaluations will be deleted. This cannot be undone.")
+                : tr("الأهل مش هيقدروا يشوفوا بياناته بعد كده، وتقدري ترجّعيه في أي وقت.", "Parents will lose access to the data; you can reactivate later.")}
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirming(null)} className="flex-1 bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl text-xs">{tr("إلغاء", "Cancel")}</button>
+              <button onClick={() => { const c = confirming; setConfirming(null); if (c === "delete") deleteRegistration(); else setStatus("stopped"); }}
+                className="flex-1 bg-rose-500 text-white font-bold py-2.5 rounded-xl text-xs">
+                {confirming === "delete" ? tr("أيوه، امسحي", "Yes, delete") : tr("أيوه، أوقفي", "Yes, withdraw")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
