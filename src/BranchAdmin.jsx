@@ -4,7 +4,7 @@ import {
   Smile, FileText, Users,
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
-import { generateReportPdfBlob } from "./lib/pdfExport";
+import { generateReportPdfBlob, generatePlanPdfBlob } from "./lib/pdfExport";
 import { DOMAINS, AGE_BANDS, LEVELS, skillsFor, messageFor, parentTip, staffTip, bandForMonths, ageInMonths } from "./devBank";
 
 export { DOMAINS };
@@ -217,6 +217,37 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
   const activeFlagAlerts = EVAL_FLAGS[lang].filter((x) => flags.includes(x.id));
 
   const lowSkills = DOMAINS.flatMap((d) => skills[d.id].filter((x) => ratings[x.id] && ratings[x.id] <= 2).map((x) => ({ ...x, domainAr: d.ar, domainEn: d.en })));
+  const [planBusy, setPlanBusy] = useState("");
+  const downloadPlan = async (L2) => {
+    const en = L2 === "en";
+    setPlanBusy(L2);
+    try {
+      const order = [...lowSkills].sort((x, y) => ratings[x.id] - ratings[y.id]);
+      const plan = {
+        lang: L2,
+        childName: (f.name || "").trim(),
+        monthLabel: (() => { const [y, m] = month.split("-").map(Number); return en ? `${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][m - 1]} ${y}` : `${AR_MONTHS[m - 1]} ${y}`; })(),
+        bandLabel: (() => { const bd = AGE_BANDS.find((x) => x.id === band); return bd ? (en ? bd.en : bd.ar) : ""; })(),
+        teacher: teacherName,
+        items: order.map((x) => {
+          const Lv = LEVELS.find((v) => v.v === ratings[x.id]);
+          return { domain: en ? x.domainEn : x.domainAr, skill: en ? x.en : x.ar, level: Lv.v, levelLabel: en ? Lv.en : Lv.ar, color: Lv.color,
+            staffTip: staffTip({ skillId: x.id, level: Lv.v, gender: f.gender, lang: L2 }), parentTip: parentTip({ skillId: x.id, level: Lv.v, gender: f.gender, lang: L2 }) };
+        }),
+      };
+      const BR = BRANCH_LABELS[reg.branch];
+      const blob = await generatePlanPdfBlob({ plan, branchLabel: BR ? BR[L2] : "" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Support-Plan-${(f.name || "child").trim().replace(/\s+/g, "-")}-${month}-${en ? "EN" : "AR"}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (_e) {
+      showToast(tr("حصل خطأ في عمل الملف", "Could not create the PDF"));
+    }
+    setPlanBusy("");
+  };
   const [sending, setSending] = useState(false);
   const [confirmSend, setConfirmSend] = useState(false);
   const existingEval = evaluations.find((e) => e.month === month);
@@ -402,6 +433,14 @@ function SkillEvalSection({ tr, lang, reg, token, showToast, onChanged }) {
               <br />{staffTip({ skillId: x.id, level: ratings[x.id], gender: f.gender, lang })}
             </div>
           ))}
+          <div className="flex gap-2 pt-1">
+            <button type="button" disabled={!!planBusy} onClick={() => downloadPlan("ar")} className="flex-1 bg-violet-600 text-white font-bold py-2 rounded-xl text-xs disabled:opacity-60">
+              {planBusy === "ar" ? tr("جارِ التجهيز...", "Preparing...") : tr("📄 PDF للطباعة — عربي", "📄 Printable PDF — Arabic")}
+            </button>
+            <button type="button" disabled={!!planBusy} onClick={() => downloadPlan("en")} className="flex-1 bg-violet-600 text-white font-bold py-2 rounded-xl text-xs disabled:opacity-60">
+              {planBusy === "en" ? tr("جارِ التجهيز...", "Preparing...") : tr("📄 PDF للطباعة — English", "📄 Printable PDF — English")}
+            </button>
+          </div>
         </div>
       )}
       <p className="text-[11px] font-bold text-slate-500 mt-3 mb-1.5 text-right">{tr("علامات متابعة (للفريق فقط — مش بتظهر للأهل)", "Follow-up flags (staff only — not shown to parents)")}</p>

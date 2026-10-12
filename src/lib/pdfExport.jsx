@@ -2,7 +2,7 @@ import { createRoot } from "react-dom/client";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { buildFormBlocks, PageShell, PAGE_W, PAGE_H, PAD_X, SLIM_H, FOOT_H } from "../FormPrint";
-import { buildReportBlocks, ReportPage, REPORT_PAGE_W, REPORT_PAGE_H, REPORT_PAD } from "../EvalPrint";
+import { buildReportBlocks, buildPlanBlocks, ReportPage, REPORT_PAGE_W, REPORT_PAGE_H, REPORT_PAD } from "../EvalPrint";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -118,9 +118,16 @@ export async function generateFormPdfBlob({ f, branch, billing, signatureDataUrl
 }
 
 // Monthly report: measure whole blocks, pack them onto A4 pages, capture each page.
-export async function generateReportPdfBlob({ report, branchLabel }) {
-  const lang = report.lang === "en" ? "en" : "ar";
-  const blocks = buildReportBlocks(report, branchLabel);
+export function generateReportPdfBlob({ report, branchLabel }) {
+  return blocksToPdfBlob(buildReportBlocks(report, branchLabel), report.lang === "en" ? "en" : "ar");
+}
+
+// Printable staff support plan (for the child's file).
+export function generatePlanPdfBlob({ plan, branchLabel }) {
+  return blocksToPdfBlob(buildPlanBlocks(plan, branchLabel), plan.lang === "en" ? "en" : "ar");
+}
+
+async function blocksToPdfBlob(blocks, lang) {
   const GAP = 12;
   const contentW = REPORT_PAGE_W - REPORT_PAD * 2;
   const availH = REPORT_PAGE_H - REPORT_PAD * 2;
