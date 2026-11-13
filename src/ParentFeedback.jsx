@@ -5,8 +5,11 @@ import { supabase } from "./lib/supabaseClient";
 import { SURVEY_SECTIONS, SURVEY_QUESTIONS, RATING_FACES, CASE_KINDS, CASE_CATEGORIES, kindOf, categoryOf, statusOf } from "./feedbackBank";
 import { quarterOf, quarterLabel } from "./partnership";
 
+let activeRegistration = null;
+export const setActiveRegistration = (id) => { activeRegistration = id; };
+
 async function call(body) {
-  const { data, error } = await supabase.functions.invoke("parent-feedback", { body });
+  const { data, error } = await supabase.functions.invoke("parent-feedback", { body: { ...body, registration_id: activeRegistration || undefined } });
   if (error || data?.error) return { error: data?.error || error?.message || "error" };
   return { data };
 }

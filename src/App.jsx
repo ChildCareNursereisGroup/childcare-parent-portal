@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import { BranchLogin, BranchAdminScreen } from "./BranchAdmin";
-import { SurveyBanner, SurveyScreen, FeedbackScreen as ParentFeedbackScreen } from "./ParentFeedback";
+import { SurveyBanner, SurveyScreen, FeedbackScreen as ParentFeedbackScreen, setActiveRegistration } from "./ParentFeedback";
 import { DOMAINS, LEVELS, AGE_BANDS, messageFor, parentTip, skillById, domainAverage } from "./devBank";
 import { generateFormPdfBlob } from "./lib/pdfExport";
 import { TERMS, CONSENTS, TERMS_VERSION } from "./terms";
@@ -353,69 +353,51 @@ function Logo({ size = 64 }) {
 }
 function Landing({ onNew, onExisting, onBranchAdmin }) {
   const { lang, setLang, tr } = useLang();
-  const branchColors = ["bg-pink-50 text-pink-600 border-pink-100", "bg-sky-50 text-sky-600 border-sky-100", "bg-amber-50 text-amber-600 border-amber-100", "bg-emerald-50 text-emerald-600 border-emerald-100", "bg-violet-50 text-violet-600 border-violet-100"];
+  const branchColors = ["#fde7f0", "#e0efff", "#fff1d6", "#dcf5ea", "#ece7ff"];
   return (
-    <div className="h-full overflow-y-auto bg-white relative">
-      <div className="relative h-60 overflow-hidden">
-        <img src={imgUrl("dance.jpg")} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-sky-700/90 via-sky-600/45 to-sky-400/25" />
-        <button onClick={() => setLang(lang === "ar" ? "en" : "ar")} className="absolute top-4 left-4 bg-white/25 backdrop-blur rounded-full px-3 py-1.5 text-xs font-bold flex items-center gap-1 text-white z-10">
+    <div className="h-full overflow-y-auto relative" style={{ background: "#f0f4ff", fontFamily: "Cairo, Tajawal, sans-serif" }}>
+      <div className="relative overflow-hidden" style={{ background: "#003087" }}>
+        <span className="absolute rounded-full border border-white/10" style={{ width: 260, height: 260, top: -90, right: -70 }} />
+        <span className="absolute rounded-full border border-white/10" style={{ width: 180, height: 180, bottom: -60, left: -40 }} />
+        <span className="absolute rounded-full" style={{ width: 120, height: 120, top: 30, left: -30, background: "rgba(244,121,32,.12)" }} />
+        <button onClick={() => setLang(lang === "ar" ? "en" : "ar")} className="absolute top-4 left-4 bg-white/15 backdrop-blur rounded-full px-3 py-1.5 text-xs font-bold flex items-center gap-1 text-white z-10">
           <Globe className="w-3.5 h-3.5" /> {lang === "ar" ? "English" : "العربية"}
         </button>
-        <div className="absolute inset-x-0 bottom-9 text-center text-white px-6">
-          <div className="flex justify-center mb-2"><Logo size={56} /></div>
-          <h1 className="text-xl font-extrabold drop-shadow">{tr("مجموعة رعاية الطفل للحضانات", "Child Care Nurseries Group")}</h1>
-          <p className="text-sky-50 text-xs mt-0.5">{tr("بوابة أولياء الأمور", "Parent Portal")}</p>
+        <div className="relative px-6 pt-14 pb-16 text-center text-white">
+          <img src={imgUrl("logo.jpg")} alt="" className="w-[68px] h-[68px] rounded-2xl mx-auto mb-3 bg-white p-1 shadow-lg" />
+          <h1 className="text-xl font-black leading-tight">{tr("مجموعة رعاية الطفل للحضانات", "Child Care Nurseries Group")}</h1>
+          <p className="font-bold mt-1" style={{ color: "#ffa550" }}>{tr("بوابة أولياء الأمور", "Parent Portal")}</p>
+          <p className="text-[11px] text-blue-100 mt-1">{tr("الشارقة وعجمان", "Sharjah & Ajman")}</p>
         </div>
       </div>
 
-      <div className="relative -mt-6 bg-white rounded-t-[2rem] px-5 pt-6 pb-8 text-slate-700">
-        <div className="flex gap-2 justify-center mb-4">
-          {[
-            { e: "🌱", ar: "منذ 2014", en: "Since 2014" },
-            { e: "🎨", ar: "منهج مونتيسوري", en: "Montessori" },
-            { e: "🏫", ar: "5 فروع", en: "5 branches" },
-          ].map((c) => (
-            <div key={c.ar} className="flex-1 bg-sky-50 border border-sky-100 rounded-2xl py-2 text-center">
-              <div className="text-lg leading-none">{c.e}</div>
-              <div className="text-[10.5px] font-extrabold text-sky-700 mt-1">{tr(c.ar, c.en)}</div>
-            </div>
-          ))}
+      <div className="relative -mt-8 bg-white rounded-t-[2rem] px-5 pt-6 pb-8 text-slate-700 shadow-[0_-8px_30px_rgba(0,48,135,.12)]">
+        <button onClick={onExisting} className="w-full text-white rounded-2xl py-3.5 px-4 shadow-lg mb-3 text-center" style={{ background: "linear-gradient(135deg, #f47920, #ffa550)", boxShadow: "0 10px 24px rgba(244,121,32,.35)" }}>
+          <span className="block text-base font-black">{tr("👨‍👩‍👧 دخول أولياء الأمور", "👨‍👩‍👧 Parent login")}</span>
+          <span className="block text-[11px] font-semibold opacity-95 mt-0.5">{tr("طفلك مسجّل عندنا؟ ادخلي بإيميلك بكود سريع — من غير باسوورد", "Child already enrolled? Sign in with an email code — no password")}</span>
+        </button>
+
+        <button onClick={onBranchAdmin} className="w-full text-white rounded-2xl py-3.5 px-4 mb-5 text-center" style={{ background: "#003087" }}>
+          <span className="block text-base font-black flex items-center justify-center gap-2"><Building2 className="w-5 h-5" /> {tr("دخول الموظفات وإدارة الفرع", "Staff & branch login")}</span>
+          <span className="block text-[11px] font-semibold text-blue-100 mt-0.5">{tr("التقييمات الشهرية · التقارير · شراكة الأهل", "Monthly evaluations · reports · parent partnership")}</span>
+        </button>
+
+        <div className="flex items-center gap-2 mb-3">
+          <span className="flex-1 h-px bg-slate-200" />
+          <span className="text-[11px] font-bold text-slate-400">{tr("طفل جديد في الحضانة؟", "New to the nursery?")}</span>
+          <span className="flex-1 h-px bg-slate-200" />
         </div>
+        <button onClick={onNew} className="w-full bg-white border-2 rounded-2xl py-3 text-sm font-extrabold" style={{ borderColor: "#003087", color: "#003087" }}>
+          {tr("📝 سجّلي طفلك الجديد", "📝 Register a new child")}
+        </button>
+        <p className="text-[10.5px] text-slate-400 text-center mt-2 leading-relaxed">{tr("الاستمارة الكاملة للأطفال الجدد فقط — الأطفال المسجّلين بالفعل بيدخلوا بالإيميل مباشرة.", "The full form is for new children only — enrolled children sign in directly with their email.")}</p>
 
-        <p className="text-xs leading-relaxed text-center text-slate-500 mb-4">
-          {tr(
-            "بيئة تعليمية آمنة ومحبة لأطفالكم، معتمدة على منهج مونتيسوري ومتوافقة مع اشتراطات هيئة الشارقة للتعليم الخاص (سبيا).",
-            "A safe, loving learning environment for your children, built on the Montessori approach and compliant with SPEA requirements."
-          )}
-        </p>
-
-        <div className="flex flex-wrap gap-1.5 justify-center mb-5">
+        <div className="flex flex-wrap gap-1.5 justify-center mt-6">
           {BRANCHES.map((b, i) => (
-            <span key={b.key} className={`text-[10.5px] px-3 py-1 rounded-full font-bold border ${branchColors[i % branchColors.length]}`}>{tr(b.name.ar, b.name.en)}</span>
+            <span key={b.key} className="text-[10.5px] px-3 py-1 rounded-full font-bold" style={{ background: branchColors[i % branchColors.length], color: "#003087" }}>{tr(b.name.ar, b.name.en)}</span>
           ))}
         </div>
-
-        <button onClick={onNew} className="w-full bg-gradient-to-l from-orange-500 to-amber-400 text-white font-extrabold py-3.5 rounded-2xl text-sm shadow-lg shadow-orange-200 mb-1">
-          {tr("📝 سجّلي طفلك الآن", "📝 Register your child")}
-        </button>
-        <p className="text-[10.5px] text-slate-400 text-center mb-3">{tr("8 خطوات سهلة · حوالي 5 دقايق · من الموبايل", "8 easy steps · about 5 minutes · from your phone")}</p>
-        <button onClick={onExisting} className="w-full bg-white border-2 border-sky-400 text-sky-600 font-bold py-3 rounded-2xl text-sm">
-          {tr("عندي حساب بالفعل — تسجيل الدخول", "I already have an account — Log in")}
-        </button>
-
-        <p className="text-[10.5px] text-slate-400 text-center mt-4 leading-relaxed">
-          {tr("ⓘ لو دي أول مرة، اضغطي \"سجّلي طفلك\" ومحتاجيش حساب. بعد موافقة الإدارة هيتبعتلك رابط دخول لمتابعة كل حاجة عن طفلك.", "ⓘ First time? Tap \"Register your child\" — no account needed. After management approval you'll get a login link to follow everything about your child.")}
-        </p>
-
-        <div className="mt-6 pt-5 border-t border-slate-100">
-          <p className="text-[11px] text-slate-400 text-center mb-2">{tr("للعاملين في الحضانة", "For nursery staff")}</p>
-          <button onClick={onBranchAdmin} className="w-full flex items-center justify-center gap-2 bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm shadow-md">
-            <Building2 className="w-4 h-4" /> {tr("دخول إدارة الفرع", "Branch admin login")}
-          </button>
-        </div>
-
-        <p className="text-[10px] text-slate-300 text-center mt-4" dir="ltr">childcareuae.com</p>
+        <p className="text-[10px] text-slate-300 text-center mt-5" dir="ltr">childcareuae.com</p>
       </div>
     </div>
   );
@@ -468,7 +450,7 @@ function Login({ onBack }) {
   };
 
   return (
-    <div className="h-full flex flex-col items-center justify-center px-8 bg-gradient-to-b from-sky-500 to-cyan-400 text-white relative">
+    <div className="h-full flex flex-col items-center justify-center px-8 text-white relative" style={{ background: "linear-gradient(180deg, #003087, #0056b3)", fontFamily: "Cairo, Tajawal, sans-serif" }}>
       {onBack && (
         <button onClick={onBack} className="absolute top-4 right-4 bg-white/20 rounded-full w-8 h-8 flex items-center justify-center">
           <ChevronLeft className={`w-4 h-4 ${lang === "en" ? "rotate-180" : ""}`} />
@@ -477,34 +459,32 @@ function Login({ onBack }) {
       <button onClick={() => setLang(lang === "ar" ? "en" : "ar")} className="absolute top-4 left-4 bg-white/20 rounded-full px-3 py-1.5 text-xs font-bold flex items-center gap-1">
         <Globe className="w-3.5 h-3.5" /> {lang === "ar" ? "English" : "العربية"}
       </button>
-      <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center mb-4">
-        <Sparkles className="w-8 h-8" />
-      </div>
+      <img src={imgUrl("logo.jpg")} alt="" className="w-16 h-16 rounded-2xl bg-white p-1 mb-4 shadow-lg" />
       <h1 className="text-lg font-extrabold mb-1 text-center">{tr("مجموعة رعاية الطفل للحضانات", "Child Care Nurseries Group")}</h1>
-      <p className="text-sky-100 text-xs mb-8">{tr("بوابة أولياء الأمور", "Parent Portal")}</p>
+      <p className="text-xs mb-8 font-bold" style={{ color: "#ffa550" }}>{tr("بوابة أولياء الأمور", "Parent Portal")}</p>
 
       {!sent ? (
         <div className="w-full bg-white rounded-2xl p-5 shadow-xl">
-          <label className="text-xs font-bold text-slate-500 block mb-1" style={{ textAlign: lang === "ar" ? "right" : "left" }}>{tr("البريد الإلكتروني", "Email address")}</label>
+          <label className="text-xs font-bold text-slate-500 block mb-1" style={{ textAlign: lang === "ar" ? "right" : "left" }}>{tr("الإيميل اللي سجّلتيه عند الحضانة", "The email you gave the nursery")}</label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={tr("مثال: name@email.com", "e.g. name@email.com")}
             style={{ textAlign: lang === "ar" ? "right" : "left" }}
             className="w-full border border-slate-200 bg-white text-slate-800 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-sky-400" />
           {error && <p className="text-xs text-rose-500 font-bold mb-3">{error}</p>}
-          <button onClick={sendLink} disabled={loading} className="w-full bg-sky-500 text-white font-bold py-2.5 rounded-xl text-sm hover:bg-sky-600 transition disabled:opacity-60">
-            {loading ? tr("جارِ الإرسال...", "Sending...") : tr("إرسال رابط الدخول", "Send login link")}
+          <button onClick={sendLink} disabled={loading} className="w-full text-white font-bold py-2.5 rounded-xl text-sm transition disabled:opacity-60" style={{ background: "#f47920" }}>
+            {loading ? tr("جارِ الإرسال...", "Sending...") : tr("إرسال كود الدخول", "Send me a login code")}
           </button>
         </div>
       ) : (
         <div className="w-full bg-white rounded-2xl p-5 shadow-xl text-center">
           <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-          <p className="text-sm text-slate-700 font-bold mb-1">{tr("تم إرسال رابط الدخول", "Login link sent")}</p>
-          <p className="text-xs text-slate-400 mb-4">{tr("افتحي بريدك الإلكتروني واضغطي على الرابط للدخول تلقائياً", "Check your email and tap the link to sign in automatically")}</p>
+          <p className="text-sm text-slate-700 font-bold mb-1">{tr("تم إرسال كود الدخول", "Login code sent")}</p>
+          <p className="text-xs text-slate-400 mb-4">{tr("افتحي إيميلك — هتلاقي كود من 6 أرقام (وكمان رابط دخول). لو مالقيتيش الرسالة، شوفي الـ Spam.", "Check your email — you will find a 6-digit code (and a sign-in link). If you do not see it, check Spam.")}</p>
           <div className="border-t border-slate-100 pt-4">
             <p className="text-xs text-slate-400 mb-2">{tr("أو أدخلي الكود المكوّن من 6 أرقام من نفس الإيميل", "Or enter the 6-digit code from the same email")}</p>
             <input type="text" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456"
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-3 text-center tracking-[0.3em] font-bold bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-400" />
             {error && <p className="text-xs text-rose-500 font-bold mb-3">{error}</p>}
-            <button onClick={verifyCode} disabled={verifying} className="w-full bg-sky-500 text-white font-bold py-2.5 rounded-xl text-sm hover:bg-sky-600 transition disabled:opacity-60">
+            <button onClick={verifyCode} disabled={verifying} className="w-full text-white font-bold py-2.5 rounded-xl text-sm transition disabled:opacity-60" style={{ background: "#f47920" }}>
               {verifying ? tr("جارِ التحقق...", "Verifying...") : tr("تأكيد الكود", "Confirm code")}
             </button>
           </div>
@@ -1716,6 +1696,49 @@ function AdminScreen({ showToast, onLogout }) {
   );
 }
 
+function AccessRequestScreen({ onLogout, userEmail, showToast, onDone }) {
+  const { tr, lang } = useLang();
+  const [branch, setBranch] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [sending, setSending] = useState(false);
+  const submit = async () => {
+    if (!branch || !name.trim()) { showToast(tr("اختاري الفرع واكتبي اسم الطفل", "Pick the branch and type the child's name")); return; }
+    setSending(true);
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await supabase.from("portal_registrations").insert({
+      branch, contact_email: userEmail, parent_user_id: u.user?.id || null, status: "pending",
+      form_data: { name: name.trim(), branch, mMobile: phone.trim() || undefined, source: "access_request", consentLang: lang },
+    });
+    setSending(false);
+    if (error) { showToast(tr("حصل خطأ، جرّبي تاني", "Something went wrong, try again")); return; }
+    showToast(tr("تم إرسال طلب التفعيل ✓", "Activation request sent ✓"));
+    onDone();
+  };
+  return (
+    <div className="h-full overflow-y-auto px-6 py-8 text-right" style={{ fontFamily: "Cairo, Tajawal, sans-serif" }}>
+      <div className="text-center mb-4">
+        <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-2" />
+        <p className="font-extrabold text-slate-800 text-sm">{tr("الإيميل ده مش مربوط بطفل لسه", "This email isn't linked to a child yet")}</p>
+        <p className="text-xs text-slate-500 leading-relaxed mt-1">{tr("لو طفلك مسجّل في الحضانة بالفعل، اكتبي بياناته هنا وإدارة الفرع هتفعّل حسابك بسرعة (من غير استمارة).", "If your child is already enrolled, enter their details and the branch will activate your account quickly (no form).")}</p>
+        <p className="text-[11px] text-slate-400 mt-1" dir="ltr">{userEmail}</p>
+      </div>
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap gap-1.5 justify-end">
+          {BRANCHES.filter((b) => b.key !== "dolphin").map((b) => (
+            <button key={b.key} type="button" onClick={() => setBranch(b.key)} className="text-[11px] font-bold px-3 py-1.5 rounded-full border"
+              style={branch === b.key ? { background: "#003087", color: "#fff", borderColor: "#003087" } : { background: "#fff", color: "#475569", borderColor: "#e2e8f0" }}>{tr(b.name.ar, b.name.en)}</button>
+          ))}
+        </div>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={tr("اسم الطفل بالكامل", "Child's full name")} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white text-slate-800" />
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={tr("موبايل ولي الأمر (اختياري)", "Parent's mobile (optional)")} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white text-slate-800" dir="ltr" />
+        <button onClick={submit} disabled={sending} className="w-full text-white font-bold py-3 rounded-xl text-sm disabled:opacity-60" style={{ background: "#f47920" }}>{sending ? tr("جارِ الإرسال...", "Sending...") : tr("إرسال طلب التفعيل", "Send activation request")}</button>
+      </div>
+      <div className="text-center mt-4"><button onClick={onLogout} className="text-xs font-bold text-slate-400">{tr("تسجيل الخروج", "Log out")}</button></div>
+    </div>
+  );
+}
+
 function PendingApprovalScreen({ onLogout, stopped }) {
   const { tr } = useLang();
   return (
@@ -1747,7 +1770,8 @@ export default function ParentPortalPrototype() {
   const [toast, setToast] = useState("");
   const [authChecked, setAuthChecked] = useState(false);
   const [userEmail, setUserEmail] = useState(null);
-  const [approvalStatus, setApprovalStatus] = useState("checking"); // checking | approved | pending
+  const [approvalStatus, setApprovalStatus] = useState("checking"); // checking | approved | pending | stopped | none
+  const [myChildren, setMyChildren] = useState([]);
   const [myRegistrationId, setMyRegistrationId] = useState(null);
   const [branchSession, setBranchSession] = useState(null);
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(""), 2400); };
@@ -1774,16 +1798,20 @@ export default function ParentPortalPrototype() {
       if (!uid) { setApprovalStatus("pending"); return; }
       supabase
         .from("portal_registrations")
-        .select("id, status")
+        .select("id, status, form_data")
         .eq("parent_user_id", uid)
         .then(({ data: rows, error }) => {
-          const approvedRow = !error && rows ? rows.find((r) => r.status === "approved") : null;
+          const approvedRows = !error && rows ? rows.filter((r) => r.status === "approved") : [];
+          const approvedRow = approvedRows[0] || null;
           const stoppedRow = !error && rows ? rows.find((r) => r.status === "stopped") : null;
-          setApprovalStatus(approvedRow ? "approved" : stoppedRow ? "stopped" : "pending");
-          setMyRegistrationId(approvedRow ? approvedRow.id : null);
+          setApprovalStatus(approvedRow ? "approved" : stoppedRow ? "stopped" : !error && rows && rows.length === 0 ? "none" : "pending");
+          setMyChildren(approvedRows.map((r) => ({ id: r.id, name: String(r.form_data?.name || "").trim().split(" ")[0] })));
+          setMyRegistrationId((cur) => (approvedRows.some((r) => r.id === cur) ? cur : approvedRow ? approvedRow.id : null));
         });
     });
   }, [userEmail]);
+
+  useEffect(() => { setActiveRegistration(myRegistrationId); }, [myRegistrationId]);
 
   const logout = async () => {
     await supabase.auth.signOut();
@@ -1830,6 +1858,8 @@ export default function ParentPortalPrototype() {
 
           {screen === "app" && userEmail === ADMIN_EMAIL && <AdminScreen showToast={showToast} onLogout={logout} />}
 
+          {screen === "app" && userEmail && userEmail !== ADMIN_EMAIL && approvalStatus === "none" && <AccessRequestScreen onLogout={logout} userEmail={userEmail} showToast={showToast} onDone={() => setApprovalStatus("pending")} />}
+
           {screen === "app" && userEmail && userEmail !== ADMIN_EMAIL && approvalStatus === "pending" && <PendingApprovalScreen onLogout={logout} />}
 
           {screen === "app" && userEmail && userEmail !== ADMIN_EMAIL && approvalStatus === "stopped" && <PendingApprovalScreen onLogout={logout} stopped />}
@@ -1852,6 +1882,14 @@ export default function ParentPortalPrototype() {
                 </button>
               </div>
 
+              {myChildren.length > 1 && (
+                <div className="flex gap-1.5 px-4 py-2 bg-white border-b border-slate-100 overflow-x-auto">
+                  {myChildren.map((c) => (
+                    <button key={c.id} onClick={() => setMyRegistrationId(c.id)} className="text-[11px] font-bold px-3 py-1 rounded-full border whitespace-nowrap"
+                      style={myRegistrationId === c.id ? { background: "#003087", color: "#fff", borderColor: "#003087" } : { background: "#fff", color: "#475569", borderColor: "#e2e8f0" }}>👶 {c.name}</button>
+                  ))}
+                </div>
+              )}
               {activeTab === "home" && <SurveyBanner tr={tr} lang={lang} onOpen={() => { setActiveTab("more"); setMoreView("survey"); }} />}
 
               <div className="flex-1 overflow-hidden">

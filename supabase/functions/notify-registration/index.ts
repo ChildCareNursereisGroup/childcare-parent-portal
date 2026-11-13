@@ -93,6 +93,16 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(supabaseUrl, serviceKey);
 
+    // Children added by staff from existing records: no e-mails (invitations are sent separately).
+    if (record.form_data?.source === "quick_add") return new Response("skipped", { status: 200 });
+    // Parent asked for fast activation: short note to management only.
+    if (record.form_data?.source === "access_request") {
+      const fd = record.form_data || {};
+      await sendEmail(resendKey, notifyEmail, `طلب تفعيل سريع - ${record.branch || "-"}`,
+        `<div dir="rtl" style="font-family:sans-serif;line-height:1.9;"><h3>طلب تفعيل سريع من ولي أمر</h3><p><b>الطفل:</b> ${esc(fd.name)}</p><p><b>الفرع:</b> ${esc(record.branch)}</p><p><b>الإيميل:</b> ${esc(record.contact_email)}</p><p><b>الموبايل:</b> ${esc(fd.mMobile)}</p><p>وافقي عليه من شاشة إدارة الفرع (فلتر الطلبات الجديدة).</p></div>`, []);
+      return new Response("ok", { status: 200 });
+    }
+
     const branch = record.branch || "-";
     const email = record.contact_email || "-";
     const billing = record.documents?.billing;
