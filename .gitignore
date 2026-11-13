@@ -6,3 +6,6 @@ dist
 .claude
 
 private/
+reports/
+Handoff_Chats_*.md
+F02_child_progress_file.docx
