@@ -364,7 +364,7 @@ function Landing({ onNew, onExisting, onBranchAdmin }) {
           <Globe className="w-3.5 h-3.5" /> {lang === "ar" ? "English" : "العربية"}
         </button>
         <div className="relative px-6 pt-14 pb-16 text-center text-white">
-          <img src={imgUrl("logo.jpg")} alt="" className="w-[68px] h-[68px] rounded-2xl mx-auto mb-3 bg-white p-1 shadow-lg" />
+          <img src={imgUrl("logo.webp")} alt="" className="w-24 h-24 rounded-full mx-auto mb-3 bg-white shadow-xl" />
           <h1 className="text-xl font-black leading-tight">{tr("مجموعة رعاية الطفل للحضانات", "Child Care Nurseries Group")}</h1>
           <p className="font-bold mt-1" style={{ color: "#ffa550" }}>{tr("بوابة أولياء الأمور", "Parent Portal")}</p>
           <p className="text-[11px] text-blue-100 mt-1">{tr("الشارقة وعجمان", "Sharjah & Ajman")}</p>
@@ -459,7 +459,7 @@ function Login({ onBack }) {
       <button onClick={() => setLang(lang === "ar" ? "en" : "ar")} className="absolute top-4 left-4 bg-white/20 rounded-full px-3 py-1.5 text-xs font-bold flex items-center gap-1">
         <Globe className="w-3.5 h-3.5" /> {lang === "ar" ? "English" : "العربية"}
       </button>
-      <img src={imgUrl("logo.jpg")} alt="" className="w-16 h-16 rounded-2xl bg-white p-1 mb-4 shadow-lg" />
+      <img src={imgUrl("logo.webp")} alt="" className="w-20 h-20 rounded-full bg-white mb-4 shadow-xl" />
       <h1 className="text-lg font-extrabold mb-1 text-center">{tr("مجموعة رعاية الطفل للحضانات", "Child Care Nurseries Group")}</h1>
       <p className="text-xs mb-8 font-bold" style={{ color: "#ffa550" }}>{tr("بوابة أولياء الأمور", "Parent Portal")}</p>
 
