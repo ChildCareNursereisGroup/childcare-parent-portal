@@ -566,6 +566,7 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
   const [newClassName, setNewClassName] = useState("");
   const [savingClass, setSavingClass] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [showManage, setShowManage] = useState(false);
 
   const approve = async () => {
     setApproving(true);
@@ -632,15 +633,22 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
           </button>
         )}
 
-        {reg.status === "approved" && (
-          <button onClick={() => setConfirming("stop")} disabled={settingStatus} className="w-full bg-rose-50 text-rose-600 border border-rose-200 font-bold py-2.5 rounded-xl text-sm disabled:opacity-60">
-            {settingStatus ? tr("جارِ الحفظ...", "Saving...") : tr("⛔ إيقاف تسجيل الطفل (توقف عن الحضانة)", "⛔ Withdraw child from nursery")}
-          </button>
-        )}
-
         {reg.status === "stopped" && (
           <button onClick={() => setStatus("approved")} disabled={settingStatus} className="w-full bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-60">
             {settingStatus ? tr("جارِ الحفظ...", "Saving...") : tr("✅ إعادة تفعيل تسجيل الطفل", "✅ Reactivate child")}
+          </button>
+        )}
+
+        <SkillEvalSection tr={tr} lang={lang} reg={reg} token={token} showToast={showToast} onChanged={onChanged} />
+
+        <button type="button" onClick={() => setShowManage((v) => !v)} className="w-full bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl text-xs">
+          {showManage ? tr("▲ إخفاء إدارة الملف", "▲ Hide file management") : tr("⚙️ إدارة ملف الطفل (بيانات، مستندات، رسوم، فصل، إيقاف، مسح)", "⚙️ Manage child file (details, documents, fees, class, withdraw, delete)")}
+        </button>
+        {showManage && (
+          <div className="space-y-4">
+        {reg.status === "approved" && (
+          <button onClick={() => setConfirming("stop")} disabled={settingStatus} className="w-full bg-rose-50 text-rose-600 border border-rose-200 font-bold py-2.5 rounded-xl text-sm disabled:opacity-60">
+            {settingStatus ? tr("جارِ الحفظ...", "Saving...") : tr("⛔ إيقاف تسجيل الطفل (توقف عن الحضانة)", "⛔ Withdraw child from nursery")}
           </button>
         )}
 
@@ -708,11 +716,12 @@ function ChildDetail({ tr, reg, classes, token, onClose, onChanged, showToast })
           </button>
         </div>
 
-        <SkillEvalSection tr={tr} lang={lang} reg={reg} token={token} showToast={showToast} onChanged={onChanged} />
-
         <button onClick={() => setConfirming("delete")} disabled={deleting} className="w-full bg-white text-rose-500 border border-rose-200 font-bold py-2.5 rounded-xl text-xs disabled:opacity-60">
           {deleting ? tr("جارِ المسح...", "Deleting...") : tr("🗑 مسح ملف الطفل نهائيًا", "🗑 Permanently delete this child's file")}
         </button>
+          </div>
+        )}
+
       </div>
 
       {confirming && (
