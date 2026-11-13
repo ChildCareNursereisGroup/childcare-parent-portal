@@ -1891,8 +1891,8 @@ export default function ParentPortalPrototype() {
   const [userEmail, setUserEmail] = useState(null);
   const [approvalStatus, setApprovalStatus] = useState("checking"); // checking | approved | pending | stopped | none
   const [myChildren, setMyChildren] = useState([]);
-  const myChild = myChildren.find((c) => c.id === myRegistrationId) || myChildren[0] || null;
   const [myRegistrationId, setMyRegistrationId] = useState(null);
+  const myChild = myChildren.find((c) => c.id === myRegistrationId) || myChildren[0] || null;
   const [branchSession, setBranchSession] = useState(null);
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(""), 2400); };
 
