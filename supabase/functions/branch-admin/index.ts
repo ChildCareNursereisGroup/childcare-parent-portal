@@ -435,7 +435,7 @@ Deno.serve(async (req) => {
         ${domainsHtml}
         ${report.note ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 14px;font-size:15px;"><b>${T.note}</b> ${esc(report.note)}</div>` : ""}
         <p style="font-size:15px;margin-top:16px;">${T.outro(attachments.length > 0)}</p>
-        ${["03", "06", "09", "12"].includes(String(month).slice(5, 7)) ? `<p style="font-size:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:10px 14px;">${T.survey}<br/><a href="https://childcarenursereisgroup.github.io/childcare-parent-portal/">childcarenursereisgroup.github.io/childcare-parent-portal</a></p>` : ""}
+        ${["03", "06", "09", "12"].includes(String(month).slice(5, 7)) ? `<p style="font-size:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:10px 14px;">${T.survey}<br/><a href="https://parents.childcareuae.com/">parents.childcareuae.com</a></p>` : ""}
         <p style="font-size:12px;color:#94a3b8;">${T.group}</p>
       </div>`;
 
@@ -587,7 +587,7 @@ Deno.serve(async (req) => {
         dolphin: { ar: "دولفين – سمنان", en: "Dolphin – Samnan" }, saadakids: { ar: "السعادة للأطفال", en: "Al Saada for Kids" }, abtal: { ar: "أبطال البراعم", en: "Abtal Al Baraiem" },
       };
       const bn = BR[branch] || { ar: branch, en: branch };
-      const portal = Deno.env.get("PORTAL_URL") || "https://childcarenursereisgroup.github.io/childcare-parent-portal/";
+      const portal = Deno.env.get("PORTAL_URL") || "https://parents.childcareuae.com/";
       const html = `<div style="font-family:Tahoma,Arial,sans-serif;max-width:560px;margin:auto;color:#0f172a;line-height:1.8;">
         <div style="background:linear-gradient(135deg,#0ea5e9,#06b6d4);border-radius:16px;padding:18px;text-align:center;color:#fff;font-size:20px;font-weight:bold;">مجموعة رعاية الطفل للحضانات<br/><span style="font-size:14px;font-weight:normal;">Child Care Nurseries Group</span></div>
         <div dir="rtl" style="margin-top:14px;"><p><b>تم تفعيل حسابك في بوابة أولياء الأمور — ${bn.ar}</b></p>
