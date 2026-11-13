@@ -8,6 +8,7 @@ import { generateReportPdfBlob, generatePlanPdfBlob } from "./lib/pdfExport";
 import { BranchReportScreen, ChildProgressSection, downloadBlob } from "./BranchProgress";
 import { buildPlan } from "./progress";
 import { PartnershipScreen } from "./BranchFeedback";
+import { QuickAddScreen } from "./QuickAdd";
 import { DOMAINS, AGE_BANDS, LEVELS, skillsFor, messageFor, parentTip, staffTip, bandForMonths, ageInMonths } from "./devBank";
 
 export { DOMAINS };
@@ -748,6 +749,8 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
   const [onlyPending, setOnlyPending] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showPartner, setShowPartner] = useState(false);
+  const [showQuick, setShowQuick] = useState(false);
+  const [classFilter, setClassFilter] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -767,6 +770,7 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
   const classNameById = Object.fromEntries(classes.map((c) => [c.id, c.name]));
   const q = search.trim().toLowerCase();
   const filtered = regs
+    .filter((r) => !classFilter || r.class_id === classFilter)
     .filter((r) => {
       if (!q) return true;
       const name = (r.form_data?.name || "").toLowerCase();
@@ -809,10 +813,19 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
         <button type="button" onClick={() => setShowReport(true)} className="w-full bg-sky-600 text-white font-bold rounded-xl px-3 py-2.5 text-xs">
           {tr("📊 تقرير نمو الفرع الشهري (مقارنة الشهور + خطط الدعم)", "📊 Branch monthly progress report (month comparison + support plans)")}
         </button>
+        <button type="button" onClick={() => setShowQuick(true)} className="w-full bg-emerald-600 text-white font-bold rounded-xl px-3 py-2.5 text-xs">
+          {tr("➕ إضافة سريعة للأطفال الحاليين (من Excel) + دعوات الأهل", "➕ Quick add existing children (from Excel) + parent invitations")}
+        </button>
         <button type="button" onClick={() => setShowPartner(true)} className="w-full bg-teal-600 text-white font-bold rounded-xl px-3 py-2.5 text-xs">
           {tr("🤝 شراكة الأهل (شكاوى + استبيان + تقرير شهري)", "🤝 Parent partnership (complaints + survey + monthly report)")}
         </button>
         {loading && <p className="text-xs text-slate-400 text-center">{tr("جارِ التحميل...", "Loading...")}</p>}
+        {classes.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 justify-end">
+            <Chip label={tr("كل الفصول", "All classes")} active={!classFilter} onClick={() => setClassFilter("")} />
+            {classes.map((c) => (<Chip key={c.id} label={c.name} active={classFilter === c.id} onClick={() => setClassFilter(c.id)} />))}
+          </div>
+        )}
         {pendingCount > 0 && (
           <button type="button" onClick={() => setOnlyPending((v) => !v)}
             className={`w-full text-[11px] font-bold rounded-xl px-3 py-2 text-right ${onlyPending ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
@@ -834,6 +847,10 @@ export function BranchAdminScreen({ tr, session, onLogout, showToast }) {
           </button>
         ))}
       </div>
+
+      {showQuick && (
+        <QuickAddScreen tr={tr} session={session} onClose={() => setShowQuick(false)} onChanged={load} showToast={showToast} />
+      )}
 
       {showPartner && (
         <PartnershipScreen tr={tr} session={session} regs={regs} branchLabel={BRANCH_LABELS[session.branch] || { ar: session.branch, en: session.branch }} onClose={() => setShowPartner(false)} showToast={showToast} />

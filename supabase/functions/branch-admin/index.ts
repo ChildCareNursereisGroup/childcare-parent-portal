@@ -486,6 +486,139 @@ Deno.serve(async (req) => {
       return json({ evaluations: data || [] });
     }
 
+    // ---- Quick add: existing (paper-registered) children, parents sign in by e-mail code ----
+    if (action === "quick_add") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      const rows: any[] = Array.isArray(body.children) ? body.children.slice(0, 60) : [];
+      if (rows.length === 0) return json({ error: "لا توجد بيانات" }, 400);
+
+      const norm = (v: unknown) => String(v ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+      const { data: existing } = await admin.from("portal_registrations").select("id, form_data, contact_email, parent_user_id").eq("branch", branch);
+      const byKey = new Map<string, any>();
+      for (const r of existing || []) byKey.set(norm(r.form_data?.name) + "|" + String(r.form_data?.dob || ""), r);
+
+      const { data: cls } = await admin.from("classes").select("id, name").eq("branch", branch);
+      const classByName = new Map<string, string>((cls || []).map((c: any) => [norm(c.name), c.id]));
+
+      let allUsers: any[] | null = null;
+      const userIdFor = async (email: string): Promise<string | null> => {
+        const { data: created, error: cErr } = await admin.auth.admin.createUser({ email, email_confirm: true });
+        if (created?.user) return created.user.id;
+        if (cErr && !String(cErr.message).toLowerCase().includes("already been registered")) return null;
+        if (!allUsers) {
+          allUsers = [];
+          for (let page = 1; page <= 10; page++) {
+            const { data: l } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+            allUsers.push(...(l?.users || []));
+            if (!l?.users || l.users.length < 1000) break;
+          }
+        }
+        return allUsers.find((u) => (u.email || "").toLowerCase() === email)?.id || null;
+      };
+
+      const results: any[] = [];
+      for (const row of rows) {
+        const name = String(row.name || "").trim();
+        if (!name) { results.push({ name: "", status: "invalid", note: "بدون اسم" }); continue; }
+        const dob = /^\d{4}-\d{2}-\d{2}$/.test(String(row.dob || "")) ? String(row.dob) : "";
+        const gender = row.gender === "girl" ? "girl" : row.gender === "boy" ? "boy" : "";
+        const email = String(row.email || "").trim().toLowerCase();
+        const emailOk = emailRe.test(email);
+        const key = norm(name) + "|" + dob;
+        const dup = byKey.get(key);
+
+        // class (create when new)
+        let classId: string | null = null;
+        const cname = String(row.class_name || "").trim();
+        if (cname) {
+          classId = classByName.get(norm(cname)) || null;
+          if (!classId) {
+            const { data: nc } = await admin.from("classes").insert({ branch, name: cname }).select("id").single();
+            classId = nc?.id || null;
+            if (classId) classByName.set(norm(cname), classId);
+          }
+        }
+
+        if (dup) {
+          // already there: fill in a missing e-mail / class, never overwrite
+          const upd: Record<string, unknown> = {};
+          if (!dup.contact_email && emailOk) { upd.contact_email = email; upd.parent_user_id = await userIdFor(email); }
+          if (Object.keys(upd).length) { await admin.from("portal_registrations").update(upd).eq("id", dup.id); results.push({ name, status: "updated", note: "اتضاف الإيميل" }); }
+          else results.push({ name, status: "duplicate", note: "موجود بالفعل" });
+          continue;
+        }
+
+        const parentUserId = emailOk ? await userIdFor(email) : null;
+        const form_data = {
+          name, gender, dob, branch,
+          mMobile: String(row.mother_phone || "").trim() || undefined,
+          fMobile: String(row.father_phone || "").trim() || undefined,
+          fName: String(row.parent_name || "").trim() || undefined,
+          villa: row.villa ? String(row.villa) : undefined,
+          source: "quick_add",
+        };
+        const { data: ins, error } = await admin.from("portal_registrations").insert({
+          branch, contact_email: emailOk ? email : null, parent_user_id: parentUserId, form_data, status: "approved", class_id: classId, source: "quick_add",
+        }).select("id").single();
+        if (error) { results.push({ name, status: "invalid", note: error.message }); continue; }
+        byKey.set(key, { id: ins.id, form_data, contact_email: emailOk ? email : null });
+        results.push({ name, status: emailOk ? "added" : "added_no_email", note: emailOk ? "" : (email ? "إيميل غير صحيح" : "بدون إيميل") });
+      }
+      return json({ ok: true, results });
+    }
+
+    // One generic invitation e-mail per parent (no child details in the message).
+    if (action === "send_invites") {
+      const branch = await requireBranchSession(body.token);
+      if (!branch) return json({ error: "الجلسة منتهية، سجّلي دخول تاني" }, 401);
+      if (!resendKey) return json({ error: "RESEND_API_KEY غير مضبوط" }, 500);
+      const limit = Math.min(Number(body.limit) || 25, 40);
+      const { data: regs } = await admin.from("portal_registrations").select("id, contact_email, invited_at").eq("branch", branch).eq("status", "approved").eq("source", "quick_add").not("contact_email", "is", null).is("invited_at", null).limit(500);
+      const byEmail = new Map<string, string[]>();
+      for (const r of regs || []) { const e = String(r.contact_email).toLowerCase(); byEmail.set(e, [...(byEmail.get(e) || []), r.id]); }
+      const emails = [...byEmail.keys()];
+      if (body.dry_run) return json({ ok: true, pending_emails: emails.length });
+
+      const BR: Record<string, { ar: string; en: string }> = {
+        farha: { ar: "الفرحة – القاسمية", en: "Al Farha – Al Qasimia" }, saada: { ar: "السعادة – الشارقان", en: "Al Saada – Al Shargan" },
+        dolphin: { ar: "دولفين – سمنان", en: "Dolphin – Samnan" }, saadakids: { ar: "السعادة للأطفال", en: "Al Saada for Kids" }, abtal: { ar: "أبطال البراعم", en: "Abtal Al Baraiem" },
+      };
+      const bn = BR[branch] || { ar: branch, en: branch };
+      const portal = Deno.env.get("PORTAL_URL") || "https://childcarenursereisgroup.github.io/childcare-parent-portal/";
+      const html = `<div style="font-family:Tahoma,Arial,sans-serif;max-width:560px;margin:auto;color:#0f172a;line-height:1.8;">
+        <div style="background:linear-gradient(135deg,#0ea5e9,#06b6d4);border-radius:16px;padding:18px;text-align:center;color:#fff;font-size:20px;font-weight:bold;">مجموعة رعاية الطفل للحضانات<br/><span style="font-size:14px;font-weight:normal;">Child Care Nurseries Group</span></div>
+        <div dir="rtl" style="margin-top:14px;"><p><b>تم تفعيل حسابك في بوابة أولياء الأمور — ${bn.ar}</b></p>
+          <p>تقدري من البوابة تتابعي تقرير نمو طفلك الشهري، وتشاركينا رأيك، وترسلي أي ملاحظة للإدارة.</p>
+          <p><b>طريقة الدخول:</b> افتحي الرابط، اكتبي نفس هذا الإيميل، وهيوصلك كود من 6 أرقام تكتبيه — من غير باسوورد.</p></div>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:14px 0;"/>
+        <div dir="ltr"><p><b>Your Parent Portal account is ready — ${bn.en}</b></p>
+          <p>Follow your child's monthly development report, share your feedback and send us any note.</p>
+          <p><b>How to sign in:</b> open the link, enter this same e-mail address and type the 6-digit code we send you — no password needed.</p></div>
+        <p style="text-align:center;margin:18px 0;"><a href="${portal}" style="background:#f97316;color:#fff;text-decoration:none;padding:12px 26px;border-radius:12px;font-weight:bold;">Open the Parent Portal · افتحي البوابة</a></p>
+        <p style="font-size:12px;color:#94a3b8;text-align:center;">${portal}</p></div>`;
+
+      const batch = emails.slice(0, limit);
+      const sent: string[] = [], failed: string[] = [];
+      for (const to of batch) {
+        try {
+          const res = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ from: "مجموعة رعاية الطفل للحضانات <login@childcareuae.com>", to, subject: "تم تفعيل حسابك في بوابة أولياء الأمور | Your Parent Portal account is ready", html }),
+          });
+          if (res.ok) {
+            sent.push(to);
+            await admin.from("portal_registrations").update({ invited_at: new Date().toISOString() }).in("id", byEmail.get(to)!);
+          } else failed.push(`${to}: ${(await res.text()).slice(0, 100)}`);
+        } catch (e) { failed.push(`${to}: ${String(e)}`); }
+        await new Promise((r) => setTimeout(r, 650));
+      }
+      return json({ ok: true, sent: sent.length, failed, remaining: emails.length - batch.length + failed.length });
+    }
+
     // ---- Parent partnership: complaints log + survey data + monthly note ----
     if (action === "list_feedback") {
       const branch = await requireBranchSession(body.token);
