@@ -4,7 +4,7 @@ import {
   Bell, LogOut, Upload, FileText, MessageCircle, CheckCircle2, Circle,
   Droplet, Moon, Smile, UtensilsCrossed, Plus, X, AlertCircle,
   Sparkles, Check, Globe, MapPin, Phone, Facebook, Instagram, ChevronRight,
-  Building2, Music2
+  Building2, Music2, Baby
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 import { BranchLogin, BranchAdminScreen } from "./BranchAdmin";
@@ -495,72 +495,48 @@ function Login({ onBack }) {
 }
 
 // ---------------- Home ----------------
-function HomeScreen({ setActiveTab, setMoreView, goBranch }) {
-  const { tr } = useLang();
+function HomeScreen({ setActiveTab, setMoreView, goBranch, child }) {
+  const { tr, lang } = useLang();
+  const branch = BRANCHES.find((b) => b.key === child?.branch);
+  const first = String(child?.name || "").trim();
+  const tile = (onClick, Icon, color, ar, en) => (
+    <button onClick={onClick} className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 text-center">
+      <Icon className={`w-5 h-5 mx-auto mb-1 ${color}`} />
+      <p className="text-[11px] font-bold text-slate-600">{tr(ar, en)}</p>
+    </button>
+  );
   return (
     <div className="px-4 py-4 space-y-3 overflow-y-auto h-full pb-4">
       <button onClick={goBranch} className="w-full flex items-center gap-3 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <div className="w-12 h-12 rounded-full bg-sky-500 text-white flex items-center justify-center font-bold text-lg">{tr("ي", "Y")}</div>
-        <div className="flex-1">
-          <p className="font-bold text-slate-800 text-sm">{tr("يوسف أحمد", "Yousef Ahmed")}</p>
+        <div className="w-12 h-12 rounded-full text-white flex items-center justify-center font-bold text-lg" style={{ background: "#003087" }}>{first ? first[0].toUpperCase() : "👶"}</div>
+        <div className="flex-1 text-start">
+          <p className="font-bold text-slate-800 text-sm">{first || tr("طفلك", "Your child")}</p>
           <p className="text-xs text-slate-400 flex items-center gap-1">
-            <Building2 className="w-3 h-3" /> {tr("فرع الفرحة – القاسمية · فصل البراعم", "Al Farha Branch – Al Qasimia · Baraem Class")}
+            <Building2 className="w-3 h-3" /> {branch ? tr(branch.name.ar, branch.name.en) : tr("مجموعة رعاية الطفل للحضانات", "Child Care Nurseries Group")}
           </p>
         </div>
         <ChevronRight className="w-4 h-4 text-slate-300" />
       </button>
 
-      <button onClick={() => setActiveTab("reports")} className="w-full bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[11px] text-sky-500 font-bold">{tr("التفاصيل ←", "Details →")}</span>
-          <p className="font-bold text-slate-800 text-sm">{tr("لمحة اليوم", "Today's snapshot")}</p>
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div>
-            <UtensilsCrossed className="w-5 h-5 mx-auto text-orange-500 mb-1" />
-            <p className="text-[11px] text-slate-500">{tr("أكل الكل", "Ate all")}</p>
-          </div>
-          <div>
-            <Droplet className="w-5 h-5 mx-auto text-sky-500 mb-1" />
-            <p className="text-[11px] text-slate-500">{tr("3 أكواب", "3 cups")}</p>
-          </div>
-          <div>
-            <Moon className="w-5 h-5 mx-auto text-indigo-500 mb-1" />
-            <p className="text-[11px] text-slate-500">1:00–2:30</p>
-          </div>
-        </div>
+      <button onClick={() => setActiveTab("reports")} className="w-full rounded-2xl p-4 shadow-sm text-white text-start" style={{ background: "linear-gradient(135deg, #003087, #0056b3)" }}>
+        <p className="font-extrabold text-sm">{tr("📈 تقرير نمو طفلك الشهري", "📈 Your child's monthly development report")}</p>
+        <p className="text-[11px] text-blue-100 mt-1">{tr("بيتحدّث مرة كل شهر من معلمة طفلك، ومعاه نصايح بسيطة للبيت.", "Updated once a month by your child's teacher, with simple tips for home.")}</p>
+        <span className="inline-block mt-2 text-[11px] font-bold rounded-full px-3 py-1" style={{ background: "#f47920" }}>{tr("عرض التقرير ←", "View report →")}</span>
       </button>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-start gap-2">
-        <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-        <p className="text-xs text-amber-700 leading-relaxed flex-1">
-          {tr("رسوم شهر أغسطس مستحقة يوم 27 — بادري بالسداد لتجنب إيقاف القبول أول الشهر.",
-              "August fees are due on the 27th — pay early to avoid enrollment being paused on the 1st.")}
-        </p>
-      </div>
-
       <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => setActiveTab("schedule")} className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 text-center">
-          <CalendarDays className="w-5 h-5 mx-auto text-purple-500 mb-1" />
-          <p className="text-[11px] font-bold text-slate-600">{tr("المواعيد", "Schedule")}</p>
-        </button>
-        <button onClick={() => { setActiveTab("more"); setMoreView("complaints"); }} className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 text-center">
-          <MessageCircle className="w-5 h-5 mx-auto text-rose-500 mb-1" />
-          <p className="text-[11px] font-bold text-slate-600">{tr("شكوى/استفسار", "Inquiry")}</p>
-        </button>
-        <button onClick={() => { setActiveTab("more"); setMoreView("documents"); }} className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 text-center">
-          <Upload className="w-5 h-5 mx-auto text-teal-500 mb-1" />
-          <p className="text-[11px] font-bold text-slate-600">{tr("رفع مستند", "Documents")}</p>
-        </button>
+        {tile(() => setActiveTab("fees"), Wallet, "text-emerald-500", "الرسوم", "Fees")}
+        {tile(() => { setActiveTab("more"); setMoreView("survey"); }, ClipboardList, "text-sky-500", "استبيان الأهل", "Survey")}
+        {tile(() => { setActiveTab("more"); setMoreView("complaints"); }, MessageCircle, "text-rose-500", "شكوى/اقتراح", "Feedback")}
       </div>
     </div>
   );
 }
 
 // ---------------- Branch Info ----------------
-function BranchScreen() {
+function BranchScreen({ branchKey }) {
   const { tr } = useLang();
-  const b = BRANCHES[0];
+  const b = BRANCHES.find((x) => x.key === branchKey) || BRANCHES[0];
   return (
     <div className="px-4 py-4 space-y-3 overflow-y-auto h-full pb-4">
       <div className="bg-gradient-to-br from-sky-500 to-cyan-400 rounded-2xl p-5 text-white">
@@ -637,6 +613,117 @@ function ScheduleScreen({ showToast }) {
       <p className="text-[11px] text-slate-400 leading-relaxed">
         {tr("ⓘ أي تعديل في أيام الحضور يحتاج موافقة الإدارة قبل يومين على الأقل.", "ⓘ Any change to attendance days requires management approval at least 2 days in advance.")}
       </p>
+    </div>
+  );
+}
+
+// ---------------- My child (data copied from the nursery system, read-only) ----------------
+const DAY_NAMES = { Mon: ["الاثنين", "Monday"], Tue: ["الثلاثاء", "Tuesday"], Wed: ["الأربعاء", "Wednesday"], Thu: ["الخميس", "Thursday"], Fri: ["الجمعة", "Friday"], Sat: ["السبت", "Saturday"], Sun: ["الأحد", "Sunday"] };
+
+function nurseryPlan(n = {}) {
+  const num = (x) => Number(x) || 0;
+  const weekend = [["Fri", num(n.fri_fee)], ["Sat", num(n.sat_fee)], ["Sun", num(n.sun_fee)]].filter(([, v]) => v > 0);
+  const monthly = num(n.fee);
+  const bus = n.uses_bus ? num(n.bus_fee) : 0;
+  const weekendTotal = weekend.reduce((a, [, v]) => a + v, 0);
+  return { monthly, bus, weekend, weekendTotal, total: monthly + bus + weekendTotal };
+}
+
+function ChildProfileScreen({ registrationId }) {
+  const { tr } = useLang();
+  const [reg, setReg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!registrationId) { setLoading(false); return; }
+    supabase.from("portal_registrations").select("branch, form_data").eq("id", registrationId).single()
+      .then(({ data }) => { setReg(data); setLoading(false); });
+  }, [registrationId]);
+
+  if (loading) return <p className="text-xs text-slate-400 text-center pt-10">{tr("جارِ التحميل...", "Loading...")}</p>;
+  if (!reg) return <p className="text-xs text-slate-400 text-center pt-10 px-8">{tr("مفيش بيانات لسه.", "No data yet.")}</p>;
+
+  const f = reg.form_data || {};
+  const n = f.nursery || {};
+  const branch = BRANCHES.find((b) => b.key === reg.branch);
+  const plan = nurseryPlan(n);
+  const days = String(n.duty_days || "").split(",").map((d) => d.trim()).filter(Boolean);
+  const age = (() => {
+    if (!f.dob) return "";
+    const d = new Date(f.dob); const now = new Date();
+    let months = (now.getFullYear() - d.getFullYear()) * 12 + now.getMonth() - d.getMonth();
+    if (now.getDate() < d.getDate()) months -= 1;
+    if (months < 0) return "";
+    const y = Math.floor(months / 12), m = months % 12;
+    return tr(`${y} ${y >= 3 && y <= 10 ? "سنوات" : "سنة"} و${m} ${m >= 3 && m <= 10 ? "شهور" : "شهر"}`, `${y}y ${m}m`);
+  })();
+  const row = (label, value) => value ? (
+    <div className="flex items-center justify-between text-xs py-2 border-b border-slate-50 last:border-0 gap-3">
+      <span className="font-bold text-slate-700 text-start" dir="auto">{value}</span>
+      <span className="text-slate-400 whitespace-nowrap">{label}</span>
+    </div>
+  ) : null;
+  const card = (title, children) => (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+      <p className="font-bold text-slate-800 text-sm mb-1">{title}</p>
+      {children}
+    </div>
+  );
+  const dirAr = { two_way: "اتجاهين", one_way: "اتجاه واحد" }, dirEn = { two_way: "Two-way", one_way: "One-way" };
+  const pdAr = { pick: "استقبال (من البيت)", drop: "توصيل (للبيت)" }, pdEn = { pick: "Pick-up", drop: "Drop-off" };
+  const money = (v) => tr(`${v} د.إ`, `AED ${v}`);
+
+  return (
+    <div className="px-4 py-4 space-y-3 overflow-y-auto h-full pb-4">
+      <div className="rounded-2xl p-4 text-white" style={{ background: "linear-gradient(135deg, #003087, #0056b3)" }}>
+        <p className="font-extrabold text-base" dir="auto">{f.name}</p>
+        <p className="text-[11px] text-blue-100 mt-1">{branch ? tr(branch.name.ar, branch.name.en) : ""}{f.className ? tr(` · فصل ${f.className}`, ` · Class ${f.className}`) : ""}</p>
+      </div>
+
+      {card(tr("بيانات الطفل", "Child details"), (
+        <>
+          {row(tr("تاريخ الميلاد", "Date of birth"), f.dob ? `${f.dob}${age ? ` (${age})` : ""}` : "")}
+          {row(tr("النوع", "Gender"), f.gender === "girl" ? tr("أنثى", "Girl") : f.gender === "boy" ? tr("ذكر", "Boy") : "")}
+          {row(tr("الفصل", "Class"), f.className)}
+          {row(tr("تاريخ الالتحاق", "Joined"), n.join_date)}
+          {row(tr("رقم التسجيل", "Registration no."), n.reg_no)}
+        </>
+      ))}
+
+      {card(tr("المواعيد", "Schedule"), (
+        <>
+          {row(tr("ساعات الدوام", "Hours"), n.kids_time)}
+          <div className="flex flex-wrap gap-1.5 justify-end pt-2">
+            {days.length === 0 && <span className="text-xs text-slate-400">{tr("لم تُسجَّل أيام الحضور", "No attendance days recorded")}</span>}
+            {days.map((d) => (
+              <span key={d} className="text-[11px] font-bold px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-100">{tr((DAY_NAMES[d] || [d, d])[0], (DAY_NAMES[d] || [d, d])[1])}</span>
+            ))}
+          </div>
+        </>
+      ))}
+
+      {n.uses_bus && card(tr("المواصلات 🚌", "Transportation 🚌"), (
+        <>
+          {row(tr("الاتجاه", "Direction"), tr(dirAr[n.bus_direction], dirEn[n.bus_direction]))}
+          {row(tr("النوع", "Type"), tr(pdAr[n.bus_pick_drop], pdEn[n.bus_pick_drop]))}
+          {row(tr("المنطقة", "Area"), n.bus_area)}
+          {row(tr("المبنى", "Building"), n.bus_building)}
+          {row(tr("أقرب معلم", "Landmark"), n.bus_landmark)}
+        </>
+      ))}
+
+      {card(tr("الرسوم الشهرية", "Monthly fees"), (
+        <>
+          {row(tr("الرسوم الدراسية", "Tuition"), plan.monthly ? money(plan.monthly) : "")}
+          {plan.bus > 0 && row(tr("المواصلات", "Transportation"), money(plan.bus))}
+          {plan.weekend.map(([d, v]) => row(tr(`رسوم يوم ${DAY_NAMES[d][0]}`, `${DAY_NAMES[d][1]} fee`), money(v)))}
+          <div className="flex items-center justify-between text-sm pt-2 mt-1 border-t border-slate-100">
+            <span className="font-extrabold" style={{ color: "#003087" }}>{plan.total ? money(plan.total) : tr("لم تُحدَّد", "Not set")}</span>
+            <span className="font-bold text-slate-700">{tr("الإجمالي الشهري", "Monthly total")}</span>
+          </div>
+        </>
+      ))}
+
+      <p className="text-[11px] text-slate-400 leading-relaxed text-center px-2">{tr("البيانات دي من سجلات الحضانة. لأي تعديل في المواعيد أو الرسوم تواصلي مع إدارة الفرع.", "This information comes from the nursery's records. To change schedule or fees, please contact the branch.")}</p>
     </div>
   );
 }
@@ -746,7 +833,7 @@ function FeesScreen({ registrationId }) {
     if (!registrationId) { setLoading(false); return; }
     supabase
       .from("portal_registrations")
-      .select("branch, documents, fee_adjustments")
+      .select("branch, documents, fee_adjustments, form_data")
       .eq("id", registrationId)
       .single()
       .then(({ data }) => { setReg(data); setLoading(false); });
@@ -754,6 +841,39 @@ function FeesScreen({ registrationId }) {
 
   if (loading) return <p className="text-xs text-slate-400 text-center pt-10">{tr("جارِ التحميل...", "Loading...")}</p>;
   if (!reg) return <p className="text-xs text-slate-400 text-center pt-10 px-8">{tr("مفيش بيانات رسوم لسه.", "No fee details yet.")}</p>;
+
+  if (!reg.documents?.billing && reg.form_data?.nursery) {
+    const plan = nurseryPlan(reg.form_data.nursery);
+    const br = BRANCHES.find((b) => b.key === reg.branch);
+    const line = (label, value) => (
+      <div className="flex items-center justify-between text-xs py-2 border-b border-slate-50 last:border-0"><span className="font-bold">{value}</span><span className="text-slate-500">{label}</span></div>
+    );
+    const m = (v) => tr(`${v} د.إ`, `AED ${v}`);
+    return (
+      <div className="px-4 py-4 space-y-3 overflow-y-auto h-full pb-4">
+        <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(135deg, #003087, #0056b3)" }}>
+          <p className="text-xs text-blue-100 mb-1">{tr("الرسوم الشهرية", "Monthly fees")}</p>
+          <p className="text-2xl font-extrabold">{plan.total ? m(plan.total) : tr("لم تُحدَّد", "Not set")}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+          <p className="font-bold text-slate-800 text-sm mb-2">{tr("تفاصيل الرسوم", "Fee details")}</p>
+          {plan.monthly > 0 && line(tr("الرسوم الدراسية", "Tuition"), m(plan.monthly))}
+          {plan.bus > 0 && line(tr("المواصلات", "Transportation"), m(plan.bus))}
+          {plan.weekend.map(([d, v]) => line(tr(`رسوم يوم ${DAY_NAMES[d][0]}`, `${DAY_NAMES[d][1]} fee`), m(v)))}
+        </div>
+        {br && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-[11px] text-emerald-700 leading-relaxed space-y-0.5">
+            <p className="font-bold text-xs">{tr("بيانات التحويل البنكي", "Bank transfer details")}</p>
+            <p>{br.bank.holder}</p>
+            <p dir="ltr">IBAN: {br.bank.iban}</p>
+            <p dir="ltr">BIC/SWIFT: {br.bank.bic}</p>
+            <p>{br.bank.bank}</p>
+          </div>
+        )}
+        <p className="text-[11px] text-slate-400 text-center leading-relaxed">{tr("الرسوم من سجلات الحضانة. لأي استفسار أو تعديل تواصلي مع إدارة الفرع.", "Fees come from the nursery's records. For any question or change, please contact the branch.")}</p>
+      </div>
+    );
+  }
 
   const billing = reg.documents?.billing || {};
   const fa = reg.fee_adjustments;
@@ -1526,7 +1646,6 @@ function MoreMenu({ setMoreView }) {
   const { tr } = useLang();
   const items = [
     { key: "register", label: tr("تسجيل طفل إضافي (أخ/أخت)", "Register another child (sibling)"), icon: FileText, color: "text-sky-500" },
-    { key: "documents", label: tr("المستندات المطلوبة", "Required documents"), icon: Upload, color: "text-teal-500" },
     { key: "survey", label: tr("استبيان الأهل (رأيك يهمنا)", "Parent survey"), icon: ClipboardList, color: "text-sky-500" },
     { key: "complaints", label: tr("الشكاوى والاقتراحات", "Complaints & suggestions"), icon: MessageCircle, color: "text-rose-500" },
     { key: "branch", label: tr("معلومات الفرع", "Branch info"), icon: Building2, color: "text-purple-500" },
@@ -1772,6 +1891,7 @@ export default function ParentPortalPrototype() {
   const [userEmail, setUserEmail] = useState(null);
   const [approvalStatus, setApprovalStatus] = useState("checking"); // checking | approved | pending | stopped | none
   const [myChildren, setMyChildren] = useState([]);
+  const myChild = myChildren.find((c) => c.id === myRegistrationId) || myChildren[0] || null;
   const [myRegistrationId, setMyRegistrationId] = useState(null);
   const [branchSession, setBranchSession] = useState(null);
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(""), 2400); };
@@ -1798,14 +1918,14 @@ export default function ParentPortalPrototype() {
       if (!uid) { setApprovalStatus("pending"); return; }
       supabase
         .from("portal_registrations")
-        .select("id, status, form_data")
+        .select("id, status, form_data, branch")
         .eq("parent_user_id", uid)
         .then(({ data: rows, error }) => {
           const approvedRows = !error && rows ? rows.filter((r) => r.status === "approved") : [];
           const approvedRow = approvedRows[0] || null;
           const stoppedRow = !error && rows ? rows.find((r) => r.status === "stopped") : null;
           setApprovalStatus(approvedRow ? "approved" : stoppedRow ? "stopped" : !error && rows && rows.length === 0 ? "none" : "pending");
-          setMyChildren(approvedRows.map((r) => ({ id: r.id, name: String(r.form_data?.name || "").trim().split(" ")[0] })));
+          setMyChildren(approvedRows.map((r) => ({ id: r.id, name: String(r.form_data?.name || "").trim().split(" ")[0], branch: r.branch || r.form_data?.branch || null })));
           setMyRegistrationId((cur) => (approvedRows.some((r) => r.id === cur) ? cur : approvedRow ? approvedRow.id : null));
         });
     });
@@ -1822,7 +1942,7 @@ export default function ParentPortalPrototype() {
 
   const tabs = [
     { key: "home", label: tr("الرئيسية", "Home"), icon: Home },
-    { key: "schedule", label: tr("المواعيد", "Schedule"), icon: CalendarDays },
+    { key: "child", label: tr("طفلي", "My child"), icon: Baby },
     { key: "reports", label: tr("التقرير", "Report"), icon: ClipboardList },
     { key: "fees", label: tr("الرسوم", "Fees"), icon: Wallet },
     { key: "more", label: tr("المزيد", "More"), icon: MoreHorizontal },
@@ -1893,8 +2013,8 @@ export default function ParentPortalPrototype() {
               {activeTab === "home" && <SurveyBanner tr={tr} lang={lang} onOpen={() => { setActiveTab("more"); setMoreView("survey"); }} />}
 
               <div className="flex-1 overflow-hidden">
-                {activeTab === "home" && <HomeScreen setActiveTab={setActiveTab} setMoreView={setMoreView} goBranch={() => { setActiveTab("more"); setMoreView("branch"); }} />}
-                {activeTab === "schedule" && <ScheduleScreen showToast={showToast} />}
+                {activeTab === "home" && <HomeScreen child={myChild} setActiveTab={setActiveTab} setMoreView={setMoreView} goBranch={() => { setActiveTab("more"); setMoreView("branch"); }} />}
+                                {activeTab === "child" && <ChildProfileScreen registrationId={myRegistrationId} />}
                 {activeTab === "reports" && <ReportsScreen registrationId={myRegistrationId} />}
                 {activeTab === "fees" && <FeesScreen registrationId={myRegistrationId} />}
                 {activeTab === "more" && !moreView && <MoreMenu setMoreView={setMoreView} />}
@@ -1903,10 +2023,9 @@ export default function ParentPortalPrototype() {
                   <div className="h-full flex flex-col">
                     <TopBar title={titles[moreView]} onBack={() => setMoreView(null)} />
                     <div className="flex-1 overflow-hidden">
-                      {moreView === "documents" && <DocumentsScreen showToast={showToast} />}
-                      {moreView === "survey" && <SurveyScreen tr={tr} lang={lang} showToast={showToast} />}
+                                            {moreView === "survey" && <SurveyScreen tr={tr} lang={lang} showToast={showToast} />}
                       {moreView === "complaints" && <ParentFeedbackScreen tr={tr} lang={lang} showToast={showToast} />}
-                      {moreView === "branch" && <BranchScreen />}
+                      {moreView === "branch" && <BranchScreen branchKey={myChild?.branch} />}
                     </div>
                   </div>
                 )}

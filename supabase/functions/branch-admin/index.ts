@@ -495,6 +495,20 @@ Deno.serve(async (req) => {
 
       const norm = (v: unknown) => String(v ?? "").trim().replace(/\s+/g, " ").toLowerCase();
       const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+      // Fees / schedule / bus data copied from the nursery system (read-only for parents).
+      const NURSERY_KEYS = ["reg_no", "join_date", "kids_time", "duty_days", "fri_fee", "sat_fee", "sun_fee", "fee", "bus_fee", "uses_bus", "bus_direction", "bus_pick_drop", "bus_area", "bus_city", "bus_building", "bus_landmark", "shift_start", "shift_end", "bus_pickup_time", "fee_notes"];
+      const cleanNursery = (n: any) => {
+        if (!n || typeof n !== "object") return undefined;
+        const out: Record<string, unknown> = {};
+        for (const k of NURSERY_KEYS) {
+          const v = n[k];
+          if (v === undefined || v === null || v === "") continue;
+          if (typeof v === "number" || typeof v === "boolean") out[k] = v;
+          else if (Array.isArray(v)) out[k] = v.map((x) => String(x).slice(0, 30)).slice(0, 14);
+          else out[k] = String(v).slice(0, 400);
+        }
+        return Object.keys(out).length ? out : undefined;
+      };
 
       const { data: existing } = await admin.from("portal_registrations").select("id, form_data, contact_email, parent_user_id").eq("branch", branch);
       const byKey = new Map<string, any>();
@@ -542,11 +556,16 @@ Deno.serve(async (req) => {
           }
         }
 
+        const nursery = cleanNursery(row.nursery);
         if (dup) {
           // already there: fill in a missing e-mail / class, never overwrite
           const upd: Record<string, unknown> = {};
+          if (body.update_existing && nursery) {
+            upd.form_data = { ...(dup.form_data || {}), nursery, ...(cname ? { className: cname } : {}) };
+            if (classId) upd.class_id = classId;
+          }
           if (!dup.contact_email && emailOk) { upd.contact_email = email; upd.parent_user_id = await userIdFor(email); }
-          if (Object.keys(upd).length) { await admin.from("portal_registrations").update(upd).eq("id", dup.id); results.push({ name, status: "updated", note: "اتضاف الإيميل" }); }
+          if (Object.keys(upd).length) { await admin.from("portal_registrations").update(upd).eq("id", dup.id); results.push({ name, status: "updated", note: "اتحدّثت البيانات" }); }
           else results.push({ name, status: "duplicate", note: "موجود بالفعل" });
           continue;
         }
@@ -558,7 +577,9 @@ Deno.serve(async (req) => {
           fMobile: String(row.father_phone || "").trim() || undefined,
           fName: String(row.parent_name || "").trim() || undefined,
           villa: row.villa ? String(row.villa) : undefined,
+          className: cname || undefined,
           source: "quick_add",
+          nursery,
         };
         const { data: ins, error } = await admin.from("portal_registrations").insert({
           branch, contact_email: emailOk ? email : null, parent_user_id: parentUserId, form_data, status: "approved", class_id: classId, source: "quick_add",
